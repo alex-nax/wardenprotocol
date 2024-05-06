@@ -165,18 +165,18 @@ export const shieldStringify = (
 };
 
 export const getAddressesFromExpression = (expression: Expression) => {
-	const addresses: string[] = [];
+	const addresses = new Set<string>();
 
 	// fixme small hack
 	shieldStringify(expression, {
 		...defaultStringifyOpts,
 		identifier: (v) => {
-			addresses.push(v);
+			addresses.add(v);
 			return v;
 		},
 	});
 
-	return addresses;
+	return Array.from(addresses);
 };
 
 /** @deprecated getting too hacky */

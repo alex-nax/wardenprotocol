@@ -119,9 +119,9 @@ const tokenize = (node: CNode, refs: Record<string, CNode>) => {
 			? normalized.split(",").map((x) => x.trim())
 			: normalized.split(" ").filter(Boolean);
 
-	if (tokens.find((x) => x.toUpperCase().startsWith("ADR"))) {
+	/* if (tokens.find((x) => x.toUpperCase().startsWith("ADR"))) {
 		type = "array";
-	}
+	} */
 
 	return { tokens, type };
 };
@@ -197,7 +197,17 @@ const findByPosition = (pos: number, refs: Record<string, CNode>) => {
 	return { node, index: i < tokens.length ? i : -1 };
 };
 
-const OPS = { AND: 1, OR: 2 } as const; // by precedence
+const OPS = {
+	AND: {
+		precedence: 1,
+		value: "&&",
+	},
+	OR: {
+		precedence: 2,
+		value: "||",
+	},
+} as const;
+
 const FNS = { ALL: 1, ANY: 2 } as const; // by arg count
 
 const parseCode = (code: string) => {
@@ -289,6 +299,111 @@ const parseCode = (code: string) => {
 
 	return { refs, errors, rootRef };
 };
+
+const toShield = (
+	node: CNode,
+	refs: Record<string, CNode>,
+	addresses: string[],
+) => {
+	if (!node.tokens) {
+		throw new Error("node not tokenized");
+	}
+
+	if (node.type === "array") {
+		return `[${node.tokens
+			.map((token) => {
+				if (token.toUpperCase().startsWith("ADR")) {
+					const index = parseInt(token.substring(3), 10) - 1;
+
+					if (!addresses[index]) {
+						// todo error handling
+						console.error("parsing error", { token, node });
+						return "false";
+					}
+
+					return addresses[index];
+				} else {
+					// todo error handling
+					console.error("parsing error", { token, node });
+					return "false";
+				}
+			})
+			.join(", ")}]`;
+	}
+
+	let result = "";
+
+	for (let i = 0; i < node.tokens.length; ++i) {
+		const token: string = node.tokens[i].toUpperCase();
+
+		if (token in refs) {
+			const ref = refs[token];
+
+			if (ref.type === "array") {
+				// todo error handling
+				console.error("parsing error", { token, node });
+				continue;
+			} else {
+				result += `(${toShield(ref, refs, addresses)})`;
+			}
+		} else if (token in OPS) {
+			const { value } = OPS[token as keyof typeof OPS];
+			result += ` ${value} `;
+		} else if (token in FNS) {
+			const argc: number | undefined = FNS[token as keyof typeof FNS];
+
+			if (!argc) {
+				// todo error handling
+				console.error("parsing error", { token, node });
+				continue;
+			}
+
+			const args: string[] = [];
+			++i;
+
+			for (let j = 0; j < argc; j++) {
+				// assume that array is last argument
+				if (j === argc - 1) {
+					console.log({ i, j, token: node.tokens[i + j] });
+					if (node.tokens[i + j].toUpperCase() === "FROM") {
+						++i;
+						const refId = node.tokens[i + j];
+
+						if (!refs[refId]) {
+							console.error("parsing error", { token, node });
+							// todo error handling
+							continue;
+						}
+
+						args.push(toShield(refs[refId], refs, addresses));
+					} else {
+						console.error("parsing error", { token, node });
+						// todo error handling
+					}
+				} else {
+					args.push(node.tokens[i + j]);
+				}
+			}
+
+			i += argc - 1;
+			result += `${token.toLowerCase()}(${args.join(", ")})`;
+		} else if (token.toUpperCase().startsWith("ADR")) {
+			// todo check correct index
+			result += addresses[parseInt(token.substring(3), 10) - 1];
+		} else {
+			console.error("parsing error", { token, node });
+			// todo error handling
+		}
+	}
+
+	return result;
+};
+
+/* usage: toShield(
+	input.parsed.result!.refs["R0"],
+	input.parsed.result?.refs ?? {},
+	addresses,
+), */
 
 interface ParseResult {
 	ok: boolean;
