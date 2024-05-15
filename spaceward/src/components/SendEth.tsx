@@ -9,10 +9,9 @@ import { SignMethod } from "warden-protocol-wardenprotocol-client-ts/lib/warden.
 import { useQueryHooks } from "@/hooks/useClient";
 import { AddressType } from "@wardenprotocol/wardenjs/codegen/warden/warden/v1beta2/key";
 import { ArrowUpRight } from "lucide-react";
+import { getProvider } from "@/lib/eth";
 
-const url = "https://ethereum-sepolia-rpc.publicnode.com";
-
-const provider = new ethers.JsonRpcProvider(url);
+const provider = getProvider("sepolia");
 
 async function buildEthTransaction(
 	chainId: string | number,
