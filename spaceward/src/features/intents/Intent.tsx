@@ -1,21 +1,22 @@
-import {
+import clsx from "clsx";
+import { CheckIcon, Edit2Icon, XIcon, Trash } from "lucide-react";
+import { Fragment, useCallback, useMemo, useReducer, useRef } from "react";
+import type {
 	ConditionType,
 	SimpleIntent as Intent,
 	IntentParams,
 } from "@/types/intent";
-import clsx from "clsx";
-import { Fragment, useCallback, useMemo, useReducer, useRef } from "react";
+import Portal from "@/components/ui/portal";
+import AddressAvatar from "@/components/AddressAvatar";
+import { useClickOutside } from "@/hooks/useClickOutside";
+import type { ActionsFromState, SetAction } from "@/types/util";
+import { Icons } from "@/components/ui/icons";
 import AdvancedMode from "./AdvancedMode";
 import CreateIntentModal from "./CreateIntentModal";
 import IntentCondition from "./IntentCondition";
-import Portal from "@/components/ui/portal";
-import AddressAvatar from "@/components/AddressAvatar";
-import { CheckIcon, Edit2Icon, XIcon } from "lucide-react";
-import { useClickOutside } from "@/hooks/useClickOutside";
 import ChangeAddressesModal from "./ChangeAddressesModal";
 import AddAddressModal from "./AddAddressModal";
-import type { ActionsFromState, SetAction } from "@/types/util";
-import { Icons } from "@/components/ui/icons";
+import type { ModalType } from "./types";
 
 type IntentEditState = "advanced" | "simple";
 
@@ -26,8 +27,8 @@ interface State {
 	addModalVisible: boolean;
 	editDropdownVisible: boolean;
 	txOverlayVisible: boolean;
-	addAddressModalVisible: boolean;
-	changeAddressModalVisible: boolean;
+	addAddressModalType: ModalType;
+	changeAddressModalType: ModalType;
 	changeAddresses: string[];
 	changeAddressesCallback?: (addresses: string[]) => void;
 }
@@ -63,8 +64,8 @@ const IntentComponent = ({
 		editDropdownVisible: false,
 		txOverlayVisible: false,
 		diff: {},
-		addAddressModalVisible: false,
-		changeAddressModalVisible: false,
+		addAddressModalType: "hidden",
+		changeAddressModalType: "hidden",
 		changeAddresses: [],
 	});
 
@@ -87,19 +88,38 @@ const IntentComponent = ({
 	const toggleChangeAddresses = useCallback(
 		(
 			addresses: string[],
-			visible: boolean,
+			type: ModalType,
 			onChange?: (addresses: string[]) => void,
 		) => {
+			if (type === "hidden") {
+				dispatch({
+					type: "set",
+					payload: {
+						changeAddresses: addresses,
+						changeAddressesCallback: onChange,
+						changeAddressModalType: type,
+					},
+				});
+
+				return;
+			}
+
+			const modal: "changeAddressModalType" | "addAddressModalType" =
+				(type === "person" ? intent.addresses : intent.whitelist)
+					?.length
+					? "changeAddressModalType"
+					: "addAddressModalType";
+
 			dispatch({
 				type: "set",
 				payload: {
 					changeAddresses: addresses,
-					changeAddressModalVisible: visible,
+					[modal]: type,
 					changeAddressesCallback: onChange,
 				},
 			});
 		},
-		[],
+		[intent.addresses],
 	);
 
 	const addCondition = useCallback(
@@ -174,9 +194,7 @@ const IntentComponent = ({
 				)}
 
 				<div className="flex items-center gap-2">
-					{editState === "advanced" ? (
-						<div />
-					) : editState === "simple" ? (
+					{editState ? (
 						<div
 							onClick={() => {
 								dispatch({
@@ -188,7 +206,7 @@ const IntentComponent = ({
 								`cursor-pointer relative group flex items-center justify-center w-8 h-8 rounded-full hover:bg-[rgba(255,174,238,0.15)] transition-all duration-300`,
 							)}
 						>
-							<img src="/images/plus-circle.svg" alt="" />
+							<Icons.plusCircle />
 
 							<div
 								className={clsx(
@@ -197,26 +215,49 @@ const IntentComponent = ({
 										`opacity-0 group-hover:opacity-0`,
 								)}
 							>
-								Add Сonditions
+								{editState === "simple"
+									? `Add Сonditions or Whitelist Addres`
+									: `Add Whitelist Address`}
 							</div>
 
 							{isCondition ? (
 								<div className="bg-[rgba(229,238,255,0.15)] backdrop-blur-[20px] absolute right-0 top-[40px] w-[240px]">
+									{editState === "simple" ? (
+										<div
+											onClick={() => {
+												dispatch({
+													type: "addModalVisible",
+													payload: true,
+												});
+											}}
+											className="cursor-pointer h-12 flex items-center px-[10px] gap-[22px] hover:bg-[rgba(229,238,255,0.3)] transition-all duration-300"
+										>
+											<Icons.fileInput />
+											<div className="text-sm whitespace-nowrap">
+												Add Approval Condition
+											</div>
+										</div>
+									) : null}
 									<div
 										onClick={() => {
-											dispatch({
-												type: "addModalVisible",
-												payload: true,
-											});
+											toggleChangeAddresses(
+												intent.whitelist ?? [],
+												"whitelist",
+												(whitelist) =>
+													dispatch({
+														type: "diff",
+														payload: {
+															...diff,
+															whitelist,
+														},
+													}),
+											);
 										}}
 										className="cursor-pointer h-12 flex items-center px-[10px] gap-[22px] hover:bg-[rgba(229,238,255,0.3)] transition-all duration-300"
 									>
-										<img
-											src="/images/file-input.svg"
-											alt="Add Approval Condition"
-										/>
+										<Icons.userPlus />
 										<div className="text-sm whitespace-nowrap">
-											Add Approval Condition
+											Add Whitelist Address
 										</div>
 									</div>
 									{!intent.id ? (
@@ -226,10 +267,8 @@ const IntentComponent = ({
 											}
 											className="cursor-pointer h-12 flex items-center px-[10px] gap-[22px] hover:bg-[rgba(229,238,255,0.3)] transition-all duration-300"
 										>
-											<img
-												src="/images/trash.svg"
-												alt=""
-											/>
+											<Trash />
+
 											<div className="text-sm whitespace-nowrap text-[#E54545]">
 												Remove
 											</div>
@@ -396,39 +435,9 @@ const IntentComponent = ({
 										},
 									});
 								}}
-								className={clsx(
-									`bg-[transparent] h-14 px-6 flex gap-2 items-center justify-center font-semibold text-foreground hover:text-accent transition-all duration-200`,
-									// Object.keys(diff).length || !intent.id
-									// 	? ``
-									// 	: `opacity-[0.3] pointer-events-none`,
-								)}
+								className="bg-[transparent] h-14 px-6 flex gap-2 items-center justify-center font-semibold text-foreground hover:text-accent transition-all duration-200"
 							>
-								<svg
-									width="24"
-									height="24"
-									viewBox="0 0 24 24"
-									fill="none"
-									xmlns="http://www.w3.org/2000/svg"
-								>
-									<g id="icon/ban">
-										<g id="Union">
-											<path
-												fillRule="evenodd"
-												clipRule="evenodd"
-												d="M12 2.5C6.75329 2.5 2.5 6.75329 2.5 12C2.5 17.2467 6.75329 21.5 12 21.5C17.2467 21.5 21.5 17.2467 21.5 12C21.5 6.75329 17.2467 2.5 12 2.5ZM1.5 12C1.5 6.20101 6.20101 1.5 12 1.5C17.799 1.5 22.5 6.20101 22.5 12C22.5 17.799 17.799 22.5 12 22.5C6.20101 22.5 1.5 17.799 1.5 12Z"
-												fill="currentColor"
-												fillOpacity="1"
-											/>
-											<path
-												fillRule="evenodd"
-												clipRule="evenodd"
-												d="M4.54645 4.54645C4.74171 4.35118 5.05829 4.35118 5.25355 4.54645L19.4536 18.7464C19.6488 18.9417 19.6488 19.2583 19.4536 19.4536C19.2583 19.6488 18.9417 19.6488 18.7464 19.4536L4.54645 5.25355C4.35118 5.05829 4.35118 4.74171 4.54645 4.54645Z"
-												fill="currentColor"
-												fillOpacity="1"
-											/>
-										</g>
-									</g>
-								</svg>
+								<Icons.ban />
 								Cancel
 							</button>
 						</div>
@@ -612,7 +621,7 @@ const IntentComponent = ({
 				</Portal>
 			)}
 
-			{addConditionModal && (
+			{addConditionModal ? (
 				<CreateIntentModal
 					onClose={() =>
 						dispatch({ type: "addModalVisible", payload: false })
@@ -620,65 +629,108 @@ const IntentComponent = ({
 					index={index}
 					addCondition={addCondition}
 				/>
-			)}
+			) : null}
+			{[state.changeAddressModalType, state.addAddressModalType].some(
+				(type) => type !== "hidden",
+			) ? (
+				<Portal domId="intent-modal">
+					<div className="bg-[rgba(64,64,64,0.40)] absolute left-0 top-0 w-full h-full backdrop-blur-[20px] flex items-center justify-center min-h-[600px]">
+						{state.addAddressModalType !== "hidden" ? (
+							<button
+								onClick={() => {
+									dispatch({
+										type: "set",
+										payload: {
+											addAddressModalType: "hidden",
+											changeAddressModalType:
+												state.addAddressModalType,
+										},
+									});
+								}}
+								className="absolute top-8 left-8 opacity-[0.5] hover:opacity-[100%] transition-all"
+							>
+								<Icons.goBack />
+							</button>
+						) : null}
 
-			{state.changeAddressModalVisible && (
-				<ChangeAddressesModal
-					onClose={() => toggleChangeAddresses([], false)}
-					addresses={intent.addresses}
-					users={state.changeAddresses}
-					showAddPerson={() =>
-						dispatch({
-							type: "addAddressModalVisible",
-							payload: true,
-						})
-					}
-					onChange={state.changeAddressesCallback}
-				/>
-			)}
+						<button
+							onClick={() => {
+								dispatch({
+									type: "set",
+									payload: {
+										changeAddresses: [],
+										changeAddressesCallback: undefined,
+										changeAddressModalType: "hidden",
+										addAddressModalType: "hidden",
+									},
+								});
+							}}
+							className="absolute top-8 right-8 opacity-[0.5] hover:opacity-[100%] transition-all"
+						>
+							<Icons.buttonClose />
+						</button>
 
-			{state.addAddressModalVisible && (
-				<AddAddressModal
-					onDone={(user) => {
-						const unique = new Set<string>();
-
-						const addresses = [...intent.addresses, user].filter(
-							(x) => {
-								if (unique.has(x)) {
-									return false;
+						{state.changeAddressModalType !== "hidden" ? (
+							<ChangeAddressesModal
+								onClose={() =>
+									toggleChangeAddresses([], "hidden")
 								}
+								addresses={intent.addresses}
+								users={state.changeAddresses}
+								showAddPerson={() =>
+									dispatch({
+										type: "set",
+										payload: {
+											addAddressModalType:
+												state.changeAddressModalType,
+											changeAddressModalType: "hidden",
+										},
+									})
+								}
+								onChange={state.changeAddressesCallback}
+								type={state.changeAddressModalType}
+							/>
+						) : null}
 
-								unique.add(x);
-								return true;
-							},
-						);
+						{state.addAddressModalType !== "hidden" ? (
+							<AddAddressModal
+								onDone={(user) => {
+									const unique = new Set<string>();
 
-						dispatch({
-							type: "diff",
-							payload: { ...diff, addresses },
-						});
-					}}
-					onPrevModal={() => {
-						dispatch({
-							type: "set",
-							payload: {
-								addAddressModalVisible: false,
-								changeAddressModalVisible: true,
-							},
-						});
-					}}
-					onClose={() =>
-						dispatch({
-							type: "set",
-							payload: {
-								changeAddresses: [],
-								changeAddressesCallback: undefined,
-								addAddressModalVisible: false,
-							},
-						})
-					}
-				/>
-			)}
+									const addresses = [
+										...intent.addresses,
+										user,
+									].filter((x) => {
+										if (unique.has(x)) {
+											return false;
+										}
+
+										unique.add(x);
+										return true;
+									});
+
+									// fixme either person or whitelist
+									dispatch({
+										type: "diff",
+										payload: { ...diff, addresses },
+									});
+								}}
+								onPrevModal={() => {
+									dispatch({
+										type: "set",
+										payload: {
+											addAddressModalType: "hidden",
+											changeAddressModalType:
+												state.addAddressModalType,
+										},
+									});
+								}}
+								type={state.addAddressModalType}
+							/>
+						) : null}
+					</div>
+				</Portal>
+			) : null}
 		</div>
 	);
 };

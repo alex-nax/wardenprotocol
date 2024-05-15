@@ -1,9 +1,10 @@
 import { ConditionType } from "@/types/intent";
-import AddressUnit from "@/components/AddressUnit";
 import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import type { Expression } from "@/types/shield";
 import AdvancedMode from "./AdvancedMode";
+import { ModalType } from "./types";
+import AddressList from "./AddressList";
 
 function ChangeHandler<T>({
 	value,
@@ -43,7 +44,7 @@ const IntentCondition = ({
 	operator?: "and" | "or";
 	toggleChangeAddresses: (
 		addresses: string[],
-		visible: boolean,
+		type: ModalType,
 		onChange?: (addresses: string[]) => void,
 	) => void;
 }) => {
@@ -187,45 +188,18 @@ const IntentCondition = ({
 						)}
 					</AdvancedMode>
 				) : (
-					<div className="mt-8 flex items-center gap-[8px] flex-wrap">
-						{users?.map((user, key) => {
-							return (
-								<AddressUnit
-									address={user}
-									key={key}
-									onRemove={() => {
-										const group = [
-											...condition.group.filter(
-												(u) => u !== user,
-											),
-										];
-										setDiff((diff) => ({ ...diff, group }));
-									}}
-								/>
-							);
-						})}
-						<button
-							onClick={() => {
-								toggleChangeAddresses(users, true, (group) =>
-									setDiff({
-										...diff,
-										group,
-									}),
-								);
-							}}
-							className={clsx(
-								`text-sm flex w-fit items-center gap-[10px] h-12`,
-								warning ? `text-[#E54545]` : `text-[#FFAEEE]`,
-							)}
-						>
-							{warning ? (
-								<img src="/images/alert-triangle.svg" alt="" />
-							) : (
-								<img src="/images/plus.svg" alt="" />
-							)}
-							Add approver
-						</button>
-					</div>
+					<AddressList
+						addresses={users}
+						onAdd={() =>
+							toggleChangeAddresses(users, "person", (group) =>
+								setDiff({
+									...diff,
+									group,
+								}),
+							)
+						}
+						onChange={(group) => setDiff({ ...diff, group })}
+					/>
 				)}
 			</div>
 		</div>
