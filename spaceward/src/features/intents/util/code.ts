@@ -21,13 +21,43 @@ interface ErrorEntry {
 	node: CNode;
 	tokenIndex: number;
 	message: string;
+	code?: string;
+	value?: string;
 }
 
 type ErrorData = Record<number, ErrorEntry[]>;
+type ArgumentType = "num" | "arr";
 
-export const FNS = { ALL: 1, ANY: 2 } as const; // by arg count
+interface FunctionDescriptor {
+	args: ArgumentType[];
+	name: string;
+}
 
-export const OPS = {
+interface OperatorDescriptor {
+	precedence: number;
+	value: string;
+}
+
+export const ERROR_CODES = {
+	OPEN_PARENTHESIS: "ERR_OPEN_PARENTHESIS",
+	CLOSE_PARENTHESIS: "ERR_CLOSE_PARENTHESIS",
+	EXPECTED_ARG_TYPE: "ERR_EXPECTED_ARG_TYPE",
+	UNEXPECTED_TOKEN_IN_ARRAY: "ERR_UNEXPECTED_TOKEN_IN_ARRAY",
+	UNEXPECTED_TOKEN: "ERR_UNEXPECTED_TOKEN",
+};
+
+export const FNS: Record<string, FunctionDescriptor> = {
+	ALL: {
+		name: "all",
+		args: ["arr"],
+	},
+	ANY: {
+		name: "any",
+		args: ["num", "arr"],
+	},
+};
+
+export const OPS: Record<string, OperatorDescriptor> = {
 	AND: {
 		precedence: 1,
 		value: "&&",
@@ -36,7 +66,83 @@ export const OPS = {
 		precedence: 2,
 		value: "||",
 	},
-} as const;
+};
+
+interface ACNode {
+	next: ACNode[];
+	parent?: ACNode;
+	value: (x: string) => string | undefined;
+	type: "root" | "fn" | "arg" | "op" | "group";
+}
+
+const insertOpNodes = (prev: ACNode, root: ACNode) => {
+	for (const [op] of getEntries(OPS)) {
+		const opNode: ACNode = {
+			parent: prev,
+			next: [root],
+			value: () => op,
+			type: "op",
+		};
+
+		prev.next.push(opNode);
+	}
+};
+
+const buildGraph = () => {
+	const root: ACNode = {
+		parent: undefined,
+		next: [],
+		value: () => undefined,
+		type: "root",
+	};
+
+	for (const [fn, fnDesc] of getEntries(FNS)) {
+		const node: ACNode = {
+			parent: root,
+			next: [],
+			value: () => fn,
+			type: "fn",
+		};
+
+		let prev: ACNode = node;
+
+		for (const arg of fnDesc.args) {
+			const argNode: ACNode = {
+				parent: prev,
+				next: [],
+				value: () => arg,
+				type: "arg",
+			};
+
+			prev.next.push(argNode);
+			prev = argNode;
+		}
+
+		insertOpNodes(prev, node);
+		root.next.push(node);
+	}
+
+	const group: ACNode = {
+		parent: root,
+		next: [root],
+		value: () => "()",
+		type: "group",
+	};
+
+	root.next.push(group);
+
+	const ref: ACNode = {
+		parent: root,
+		next: [],
+		value: (x) => x,
+		type: "arg",
+	};
+
+	insertOpNodes(ref, root);
+	root.next.push(ref);
+};
+
+export const AUTOCOMPLETE_GRAPH = buildGraph();
 
 export const isTokenized = (node?: CNode): node is IsTokenized =>
 	Boolean(node?.type && node?.tokenRanges && node?.tokens);
@@ -227,8 +333,9 @@ export const parseCode = (code: string) => {
 			}
 		} else if (Object.values(parens).includes(char as any)) {
 			errs.add(i, {
-				node: refs[rootRef],
+				code: ERROR_CODES.OPEN_PARENTHESIS,
 				message: "Missing opening parenthesis",
+				node: refs[rootRef],
 				tokenIndex: -1,
 			});
 		}
@@ -236,8 +343,9 @@ export const parseCode = (code: string) => {
 
 	if (stack.length) {
 		errs.add(stack[stack.length - 1].start, {
-			node: refs[rootRef],
+			code: ERROR_CODES.CLOSE_PARENTHESIS,
 			message: "Missing closing parenthesis",
+			node: refs[rootRef],
 			tokenIndex: -1,
 		});
 	}
@@ -284,6 +392,23 @@ export function hasEntries<T>(obj?: T): obj is T {
 	return obj ? Boolean(Object.keys(obj).length) : false;
 }
 
+export function getFirstEntry<T>(obj?: T): [keyof T, T[keyof T]] | undefined {
+	if (!hasEntries(obj)) {
+		return;
+	}
+
+	const key = Object.keys(obj as any)[0] as keyof T;
+	return [key, obj[key]];
+}
+
+export function getEntries<T>(obj?: T): [keyof T, T[keyof T]][] {
+	if (!hasEntries(obj)) {
+		return [];
+	}
+
+	return Object.entries(obj as any) as [keyof T, T[keyof T]][];
+}
+
 export const toShield = (
 	node: CNode,
 	refs: RefDictionary,
@@ -327,6 +452,8 @@ export const toShield = (
 							node,
 							tokenIndex: i,
 							message: `Unexpected token: ${token}`,
+							code: ERROR_CODES.UNEXPECTED_TOKEN_IN_ARRAY,
+							value: token,
 						});
 
 						return "false";
@@ -367,7 +494,8 @@ export const toShield = (
 			const { value } = OPS[token as keyof typeof OPS];
 			result += ` ${value} `;
 		} else if (token in FNS) {
-			const argc: number | undefined = FNS[token as keyof typeof FNS];
+			const fn: FunctionDescriptor = FNS[token];
+			const argc = fn.args.length;
 
 			if (!argc) {
 				errs.add(i, {
@@ -383,17 +511,55 @@ export const toShield = (
 			++i;
 
 			for (let j = 0; j < argc; j++) {
-				// assume that array is last argument
-				if (j === argc - 1) {
-					if (node.tokens[i + j]?.toUpperCase() === "FROM") {
-						++i;
-						const refId = node.tokens[i + j];
+				const type = fn.args[j];
+
+				switch (type) {
+					case "num": {
+						const tokenIndex = i + j;
+						const value = node.tokens[tokenIndex];
+						args.push(value);
+
+						if (!Number.isFinite(parseInt(value, 10))) {
+							errs.add(tokenIndex, {
+								node,
+								tokenIndex,
+								// TODO first argument can be not a number for some function
+								message: `${token} function expects arg[${j}] to be a number`,
+								code: ERROR_CODES.EXPECTED_ARG_TYPE,
+								value: "num",
+							});
+						}
+
+						break;
+					}
+
+					case "arr": {
+						const fromIndex = i + j;
+
+						if (node.tokens[fromIndex]?.toUpperCase() !== "FROM") {
+							errs.add(fromIndex, {
+								node,
+								tokenIndex: fromIndex,
+								message: "FROM expected",
+								code: ERROR_CODES.EXPECTED_ARG_TYPE,
+								value: "util",
+							});
+
+							continue;
+						}
+
+						const arrIndex = ++i + j;
+						const refId = node.tokens[arrIndex];
 
 						if (!refs[refId]) {
-							errs.add(i + j, {
+							errs.add(arrIndex, {
 								node,
-								tokenIndex: i + j,
+								tokenIndex: arrIndex,
 								message: `Ref[${refId}] not found`,
+								code: refId
+									? ERROR_CODES.UNEXPECTED_TOKEN
+									: ERROR_CODES.EXPECTED_ARG_TYPE,
+								value: refId ? refId : "ref",
 							});
 
 							continue;
@@ -412,15 +578,20 @@ export const toShield = (
 						}
 
 						args.push(value);
-					} else {
+						break;
+					}
+
+					default: {
 						errs.add(i + j, {
 							node,
 							tokenIndex: i + j,
-							message: "FROM expected",
+							message: `Unexpected arg type: ${type}`,
+							code: ERROR_CODES.EXPECTED_ARG_TYPE,
+							value: type,
 						});
+
+						break;
 					}
-				} else {
-					args.push(node.tokens[i + j]);
 				}
 			}
 
@@ -434,6 +605,8 @@ export const toShield = (
 				node,
 				tokenIndex: i,
 				message: `Unexpected token: ${token}`,
+				code: ERROR_CODES.UNEXPECTED_TOKEN,
+				value: token,
 			});
 		}
 	}

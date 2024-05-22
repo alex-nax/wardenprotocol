@@ -15,9 +15,12 @@ import {
 } from "react";
 
 import {
+	AUTOCOMPLETE_GRAPH,
 	CNode,
+	ERROR_CODES,
 	findError,
 	FNS,
+	getEntries,
 	hasEntries,
 	isTokenized,
 	OPS,
@@ -34,7 +37,7 @@ import AddressList from "./AddressList";
 
 interface Result {
 	code: string;
-	isError: boolean;
+	error?: string;
 	isUpdated: boolean;
 }
 
@@ -77,6 +80,7 @@ interface Suggestion {
 	description?: string | ((params: AutocompleteParams) => string);
 	tags: string[];
 	multi?: keyof Omit<AutocompleteParams, "index"> | number;
+	prefix?: boolean;
 }
 
 const getTokenPosition = (index: number, node: CNode) => {
@@ -109,7 +113,24 @@ const findByPosition = (pos: number, refs: RefDictionary) => {
 				throw new Error(`node ${node.id} not initialized`);
 			}
 
-			return { index: -1, node, parent };
+			if (node.id !== root.id) {
+				throw new Error(
+					`position ${pos} out of node range ${node.range}`,
+				);
+			}
+
+			const [tokenRange] = node.tokenRanges.slice(-1);
+
+			return {
+				index: -1,
+				node,
+				parent,
+				prev: tokenRange[1]
+					? pos === tokenRange[1] + 1
+						? node.tokens.length - 1
+						: -1
+					: -1,
+			};
 		}
 
 		let inChildren = false;
@@ -172,7 +193,7 @@ const SUGGESTIONS: Suggestion[] = [
 			typeof index === "number" ? `ADR${index + 1}` : "ADR",
 		description: ({ addresses, index }) =>
 			typeof index === "number" ? addresses[index] : "",
-		tags: ["ref"],
+		tags: ["ref", "root"],
 		multi: "addresses",
 	},
 	{
@@ -182,6 +203,17 @@ const SUGGESTIONS: Suggestion[] = [
 		multi: 5,
 	},
 	{ value: "FROM", tags: ["util"] },
+	{
+		value: "(",
+		description: "Add open parenthesis",
+		tags: ["error", "open_parenthesis"],
+		prefix: true,
+	},
+	{
+		value: ")",
+		description: "Add close parenthesis",
+		tags: ["error", "close_parenthesis"],
+	},
 ];
 
 const useInput = (code: string, params?: Omit<AutocompleteParams, "index">) => {
@@ -226,65 +258,148 @@ const useInput = (code: string, params?: Omit<AutocompleteParams, "index">) => {
 		return toShield(root, refs, params?.addresses ?? []);
 	}, [parsed.result, params?.addresses]);
 
-	const suggest: { tags: string[]; val?: string; type: "replace" | "next" } =
-		useMemo(() => {
-			const tags: string[] = [];
-			const refs = parsed.result?.refs;
-			let type: "replace" | "next" = "replace";
+	const suggest: {
+		tags: string[];
+		val?: string;
+		type: "replace" | "next" | "insert";
+		threshold?: number;
+	} = useMemo(() => {
+		const tags = new Set<string>(["root"]);
+		const refs = parsed.result?.refs;
+		let type: "replace" | "next" | "insert" = "replace";
 
-			if (!isTokenized(_node?.node) || !refs) {
-				return { tags, type };
+		if (hasEntries(parsed.result?.errors)) {
+			type = "insert";
+
+			for (const [charAt, errs] of getEntries(parsed.result.errors)) {
+				for (const err of errs) {
+					switch (err?.code) {
+						case ERROR_CODES.CLOSE_PARENTHESIS:
+							if (position >= charAt) {
+								tags.delete("root");
+								tags.add("error");
+								tags.add("close_parenthesis");
+							}
+
+							break;
+						case ERROR_CODES.OPEN_PARENTHESIS:
+							if (position <= charAt) {
+								tags.delete("root");
+								tags.add("error");
+								tags.add("open_parenthesis");
+							}
+
+							break;
+						default:
+					}
+				}
 			}
 
-			const { node, prev } = _node;
-			let index = _node.index;
+			return { tags: Array.from(tags), type };
+		}
 
-			if (index < 0) {
-				if (typeof prev === "number" && prev >= 0) {
-					const range = node.tokenRanges[prev];
+		if (!isTokenized(_node?.node) || !refs) {
+			return { tags: Array.from(tags), type };
+		}
 
-					if (position === range[1] + 1) {
-						index = prev;
-					} else {
-						type = "next";
+		const { node, prev } = _node;
+		console.log(node.tokens)
+
+		if (hasEntries(shield?.errors)) {
+			for (const [index, errs] of getEntries(shield.errors)) {
+				for (const err of errs) {
+					switch (err.code) {
+						case ERROR_CODES.UNEXPECTED_TOKEN_IN_ARRAY: {
+							return { tags: ["ref"], type: "replace" };
+						}
+
+						case ERROR_CODES.UNEXPECTED_TOKEN: {
+							console.log({ index, err });
+							if (err.value) {
+								return {
+									tags: [],
+									type:
+										_node.index >= 0
+											? "replace"
+											: _node.prev >= 0
+												? "replace"
+												: "next",
+									val: err.value,
+									threshold: err.value.length,
+								};
+							}
+
+							break;
+						}
+
+						case ERROR_CODES.EXPECTED_ARG_TYPE: {
+							if (err.value) {
+								return { tags: [err.value], type: "replace" };
+							}
+
+							break;
+						}
+						default:
+							break;
 					}
+				}
+			}
+		}
+
+		let index = _node.index;
+
+		if (index < 0) {
+			if (typeof prev === "number" && prev >= 0) {
+				const range = node.tokenRanges[prev];
+
+				if (position === range[1] + 1) {
+					index = prev;
 				} else {
 					type = "next";
 				}
-			}
-
-			if (node?.type === "array") {
-				tags.push("ref");
 			} else {
-				if (!node.tokens?.length) {
-					tags.push("root");
-					return { tags, type };
-				}
+				type = "next";
+			}
+		}
 
-				if (index === 0) {
-					tags.push("root");
-				} else if (index < 0) {
-					const token = (
-						prev ? node.tokens[prev] : node.tokens.slice(-1)[0]
-					)?.toUpperCase();
-
-					if (token in refs) {
-						tags.push("op");
-					} else if (token in OPS) {
-						tags.push("call");
-						tags.push("group");
-					} else if (token in FNS) {
-						tags.push(token === "ALL" ? "util" : "num");
-					}
-				}
+		if (node?.type === "array") {
+			tags.add("ref");
+		} else {
+			if (!node.tokens?.length) {
+				tags.add("root");
+				return { tags: Array.from(tags), type };
 			}
 
-			const token = index >= 0 ? node.tokens[index] : undefined;
-			return { tags, val: token, type };
-		}, [_node, parsed.result?.refs, position, shield?.errors]);
+			if (index === 0) {
+				tags.add("root");
+			} else if (index < 0) {
+				const token = (
+					prev ? node.tokens[prev] : node.tokens.slice(-1)[0]
+				)?.toUpperCase();
+
+				if (token in refs) {
+					tags.add("op");
+				} else if (token in OPS) {
+					tags.add("call");
+					tags.add("group");
+				} else if (token in FNS) {
+					tags.add(token === "ALL" ? "util" : "num");
+				}
+			}
+		}
+
+		const token = index >= 0 ? node.tokens[index] : undefined;
+		return { tags: Array.from(tags), val: token, type };
+	}, [
+		_node,
+		parsed.result?.refs,
+		parsed.result?.errors,
+		position,
+		shield?.errors,
+	]);
 
 	const suggestions = useMemo(() => {
-		const THRESHOLD = 2;
+		const THRESHOLD = suggest.threshold ?? 2;
 		const searchValue = suggest.val?.toUpperCase();
 
 		const items = SUGGESTIONS.flatMap((x) => {
@@ -331,7 +446,7 @@ const useInput = (code: string, params?: Omit<AutocompleteParams, "index">) => {
 				return true;
 			})
 			.sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0));
-	}, [suggest, params?.addresses]);
+	}, [suggest, params?.addresses, shield?.errors]);
 
 	const autoComplete = useCallback(
 		(i: number) => {
@@ -339,6 +454,29 @@ const useInput = (code: string, params?: Omit<AutocompleteParams, "index">) => {
 			const refs = parsed.result?.refs;
 
 			if (!item || !refs) {
+				return;
+			}
+
+			if (suggest.type === "insert") {
+				const value = " " + item.value;
+				const _code = replaceAt(
+					state.code,
+					value,
+					item.prefix
+						? [position - 1, position - 1]
+						: [position, position],
+				);
+
+				dispatch({
+					type: "code",
+					payload: _code,
+				});
+
+				setTimeout(() =>
+					setPosition(
+						item.prefix ? position : position + value.length,
+					),
+				);
 				return;
 			}
 
@@ -618,7 +756,7 @@ export default function AdvancedMode({
 				}
 			/>
 
-			{false /* DEBUG INFO */ ? (
+			{true /* DEBUG INFO */ ? (
 				<div className="flex w-1">
 					<pre>
 						{JSON.stringify(
@@ -745,9 +883,7 @@ export default function AdvancedMode({
 
 			{children?.({
 				code: input.shield?.value ?? "",
-				isError: Boolean(
-					!input.parsed.ok || hasEntries(input.shield?.errors),
-				),
+				error: error?.message ?? input.parsed.message,
 				isUpdated,
 			})}
 		</div>
