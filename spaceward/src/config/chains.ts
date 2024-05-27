@@ -6,7 +6,7 @@ export const wardenprotocollocal: Chain = {
 	status: "live",
 	network_type: "testnet",
 	pretty_name: "Warden Protocol (local)",
-	chain_id: "warden",
+	chain_id: "wardenprotocol",
 	bech32_prefix: "warden",
 	daemon_name: "wardend",
 	node_home: "$HOME/.warden",

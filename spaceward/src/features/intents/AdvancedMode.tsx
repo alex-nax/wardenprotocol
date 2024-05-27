@@ -125,7 +125,7 @@ const findByPosition = (pos: number, refs: RefDictionary) => {
 				index: -1,
 				node,
 				parent,
-				prev: tokenRange[1]
+				prev: tokenRange?.[1]
 					? pos === tokenRange[1] + 1
 						? node.tokens.length - 1
 						: -1
@@ -303,7 +303,74 @@ const useInput = (code: string, params?: Omit<AutocompleteParams, "index">) => {
 		}
 
 		const { node, prev } = _node;
-		console.log(node.tokens)
+		let index = _node.index;
+
+		if (index < 0) {
+			if (typeof prev === "number" && prev >= 0) {
+				const range = node.tokenRanges[prev];
+
+				if (position === range[1] + 1) {
+					index = prev;
+				} else {
+					type = "next";
+				}
+			} else {
+				type = "next";
+			}
+		}
+
+		const acRoot = AUTOCOMPLETE_GRAPH;
+		let acNode = acRoot;
+		let found = false;
+
+		for (let i = 0; i <= index; i++) {
+			const token = node.tokens[i];
+			found = false;
+
+			for (const next of acNode.next) {
+				const value = next.value(/* fixme adr */ "");
+				// console.log({ next }, next.value(""));
+				switch (next.type) {
+					case "arg":
+						if (value === "num") {
+							if (Number.isFinite(parseInt(token))) {
+								acNode = next;
+								found = true;
+								break;
+							}
+						} else if (value === "arr") {
+							console.log({ token, value})
+
+						}
+
+						break;
+
+					default:
+						console.log(next, value)
+						if (value?.toLowerCase() === token.toLowerCase()) {
+							acNode = next;
+							found = true;
+							break;
+						}
+				}
+			}
+
+			console.log({ found, acNode });
+
+			if (!found) {
+				break;
+			}
+		}
+
+		console.log(
+			acNode.next.map((x) => x.value("")),
+			type,
+			found,
+		);
+
+		if (found) {
+			type = "next";
+		}
 
 		if (hasEntries(shield?.errors)) {
 			for (const [index, errs] of getEntries(shield.errors)) {
@@ -334,7 +401,7 @@ const useInput = (code: string, params?: Omit<AutocompleteParams, "index">) => {
 
 						case ERROR_CODES.EXPECTED_ARG_TYPE: {
 							if (err.value) {
-								return { tags: [err.value], type: "replace" };
+								return { tags: [err.value], type };
 							}
 
 							break;
@@ -343,22 +410,6 @@ const useInput = (code: string, params?: Omit<AutocompleteParams, "index">) => {
 							break;
 					}
 				}
-			}
-		}
-
-		let index = _node.index;
-
-		if (index < 0) {
-			if (typeof prev === "number" && prev >= 0) {
-				const range = node.tokenRanges[prev];
-
-				if (position === range[1] + 1) {
-					index = prev;
-				} else {
-					type = "next";
-				}
-			} else {
-				type = "next";
 			}
 		}
 
@@ -492,7 +543,7 @@ const useInput = (code: string, params?: Omit<AutocompleteParams, "index">) => {
 				if (typeof prev === "number") {
 					// fixme proper position
 					_tokens.splice(prev + 1, 0, item.value);
-					at = tokenRanges[prev][1] + 1;
+					at = (tokenRanges[prev]?.[1] ?? -1) + 1;
 				} else {
 					_tokens.push(item.value);
 					at = range[1] + 1;

@@ -18623,7 +18623,7 @@ paths:
               key_id:
                 type: string
                 format: uint64
-              data_for_signing:
+              input:
                 type: string
                 format: byte
               sign_method:
@@ -18822,6 +18822,10 @@ paths:
               btl:
                 type: string
                 format: uint64
+              analyzers:
+                type: array
+                items:
+                  type: string
       tags:
         - Msg
   /warden.warden.v1beta2.Msg/NewSpace:
@@ -20406,6 +20410,1792 @@ paths:
                 format: uint64
       tags:
         - Msg
+  /warden/warden/v1beta2/get_signature_requests:
+    get:
+      summary: Queries a list of SignatureRequests items.
+      operationId: WardenWardenV1Beta2Query_SignatureRequests
+      responses:
+        '200':
+          description: A successful response.
+          schema:
+            type: object
+            properties:
+              pagination:
+                type: object
+                properties:
+                  next_key:
+                    type: string
+                    format: byte
+                    description: |-
+                      next_key is the key to be passed to PageRequest.key to
+                      query the next page most efficiently. It will be empty if
+                      there are no more results.
+                  total:
+                    type: string
+                    format: uint64
+                    title: >-
+                      total is total number of results available if
+                      PageRequest.count_total
+
+                      was set, its value is undefined otherwise
+                description: >-
+                  PageResponse is to be embedded in gRPC response messages where
+                  the
+
+                  corresponding request message has used PageRequest.
+
+                   message SomeResponse {
+                           repeated Bar results = 1;
+                           PageResponse page = 2;
+                   }
+              sign_requests:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      format: uint64
+                    creator:
+                      type: string
+                    key_id:
+                      type: string
+                      format: uint64
+                    data_for_signing:
+                      type: string
+                      format: byte
+                    status:
+                      type: string
+                      enum:
+                        - SIGN_REQUEST_STATUS_UNSPECIFIED
+                        - SIGN_REQUEST_STATUS_PENDING
+                        - SIGN_REQUEST_STATUS_FULFILLED
+                        - SIGN_REQUEST_STATUS_REJECTED
+                      default: SIGN_REQUEST_STATUS_UNSPECIFIED
+                      description: >-
+                        SignRequestStatus indicates the status of a signature
+                        request.
+
+                        A request starts as "pending", waiting to be picked up.
+                        Then it can move to
+
+                        either "approved" or "rejected", depending on the
+                        decision of the keychain.
+
+                         - SIGN_REQUEST_STATUS_UNSPECIFIED: The request is missing the status field.
+                         - SIGN_REQUEST_STATUS_PENDING: The request is waiting to be fulfilled. This is the initial state of a
+                        request.
+                         - SIGN_REQUEST_STATUS_FULFILLED: The request was fulfilled. This is a final state for a request.
+                         - SIGN_REQUEST_STATUS_REJECTED: The request was rejected. This is a final state for a request.
+                    signed_data:
+                      type: string
+                      format: byte
+                    reject_reason:
+                      type: string
+        default:
+          description: An unexpected error response.
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+              message:
+                type: string
+              details:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    '@type':
+                      type: string
+                  additionalProperties: {}
+      parameters:
+        - name: pagination.key
+          description: |-
+            key is a value returned in PageResponse.next_key to begin
+            querying the next page most efficiently. Only one of offset or key
+            should be set.
+          in: query
+          required: false
+          type: string
+          format: byte
+        - name: pagination.offset
+          description: >-
+            offset is a numeric offset that can be used when key is unavailable.
+
+            It is less efficient than using key. Only one of offset or key
+            should
+
+            be set.
+          in: query
+          required: false
+          type: string
+          format: uint64
+        - name: pagination.limit
+          description: >-
+            limit is the total number of results to be returned in the result
+            page.
+
+            If left empty it will default to a value to be set by each app.
+          in: query
+          required: false
+          type: string
+          format: uint64
+        - name: pagination.count_total
+          description: >-
+            count_total is set to true  to indicate that the result set should
+            include
+
+            a count of the total number of items available for pagination in
+            UIs.
+
+            count_total is only respected when offset is used. It is ignored
+            when key
+
+            is set.
+          in: query
+          required: false
+          type: boolean
+        - name: pagination.reverse
+          description: >-
+            reverse is set to true if results are to be returned in the
+            descending order.
+
+
+            Since: cosmos-sdk 0.43
+          in: query
+          required: false
+          type: boolean
+        - name: keychain_id
+          in: query
+          required: false
+          type: string
+          format: uint64
+        - name: status
+          description: |-
+            Optional
+
+             - SIGN_REQUEST_STATUS_UNSPECIFIED: The request is missing the status field.
+             - SIGN_REQUEST_STATUS_PENDING: The request is waiting to be fulfilled. This is the initial state of a
+            request.
+             - SIGN_REQUEST_STATUS_FULFILLED: The request was fulfilled. This is a final state for a request.
+             - SIGN_REQUEST_STATUS_REJECTED: The request was rejected. This is a final state for a request.
+          in: query
+          required: false
+          type: string
+          enum:
+            - SIGN_REQUEST_STATUS_UNSPECIFIED
+            - SIGN_REQUEST_STATUS_PENDING
+            - SIGN_REQUEST_STATUS_FULFILLED
+            - SIGN_REQUEST_STATUS_REJECTED
+          default: SIGN_REQUEST_STATUS_UNSPECIFIED
+      tags:
+        - Query
+  /warden/warden/v1beta2/key_by_id:
+    get:
+      summary: Queries a Key by its ID.
+      operationId: WardenWardenV1Beta2Query_KeyById
+      responses:
+        '200':
+          description: A successful response.
+          schema:
+            type: object
+            properties:
+              key:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uint64
+                  space_id:
+                    type: string
+                    format: uint64
+                  keychain_id:
+                    type: string
+                    format: uint64
+                  type:
+                    type: string
+                    enum:
+                      - KEY_TYPE_UNSPECIFIED
+                      - KEY_TYPE_ECDSA_SECP256K1
+                      - KEY_TYPE_EDDSA_ED25519
+                    default: KEY_TYPE_UNSPECIFIED
+                    description: >-
+                      KeyType indicates what crypto scheme will be used by this
+                      key (e.g.
+
+                      ECDSA). Its public key will be one of the specified type.
+
+                       - KEY_TYPE_UNSPECIFIED: The key type is missing.
+                       - KEY_TYPE_ECDSA_SECP256K1: The key is an ECDSA secp256k1 key.
+                       - KEY_TYPE_EDDSA_ED25519: The key is an EdDSA Ed25519 key.
+                  public_key:
+                    type: string
+                    format: byte
+                  intent_id:
+                    type: string
+                    format: uint64
+                    description: >-
+                      IntentId is the ID of the intent that will need to be
+                      satisfied for using
+
+                      this key to sign data.
+
+                      If this is not set, the key will use the signing intent of
+                      the Space.
+              addresses:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    address:
+                      type: string
+                    type:
+                      type: string
+                      enum:
+                        - ADDRESS_TYPE_UNSPECIFIED
+                        - ADDRESS_TYPE_ETHEREUM
+                        - ADDRESS_TYPE_OSMOSIS
+                      default: ADDRESS_TYPE_UNSPECIFIED
+                      description: |2-
+                         - ADDRESS_TYPE_UNSPECIFIED: The address type is missing.
+                         - ADDRESS_TYPE_ETHEREUM: Ethereum address type (e.g. 0x71C7656EC7ab88b098defB751B7401B5f6d8976F).
+                         - ADDRESS_TYPE_OSMOSIS: Osmosis address type (e.g. osmo10kmgv5gzygnecf46x092ecfe5xcvvv9rlt823n).
+        default:
+          description: An unexpected error response.
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+              message:
+                type: string
+              details:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    '@type':
+                      type: string
+                  additionalProperties: {}
+      parameters:
+        - name: id
+          in: query
+          required: false
+          type: string
+          format: uint64
+        - name: derive_addresses
+          description: |-
+            Optional
+
+             - ADDRESS_TYPE_UNSPECIFIED: The address type is missing.
+             - ADDRESS_TYPE_ETHEREUM: Ethereum address type (e.g. 0x71C7656EC7ab88b098defB751B7401B5f6d8976F).
+             - ADDRESS_TYPE_OSMOSIS: Osmosis address type (e.g. osmo10kmgv5gzygnecf46x092ecfe5xcvvv9rlt823n).
+          in: query
+          required: false
+          type: array
+          items:
+            type: string
+            enum:
+              - ADDRESS_TYPE_UNSPECIFIED
+              - ADDRESS_TYPE_ETHEREUM
+              - ADDRESS_TYPE_OSMOSIS
+          collectionFormat: multi
+      tags:
+        - Query
+  /warden/warden/v1beta2/key_request_by_id:
+    get:
+      summary: Queries a single KeyRequest by its id.
+      operationId: WardenWardenV1Beta2Query_KeyRequestById
+      responses:
+        '200':
+          description: A successful response.
+          schema:
+            type: object
+            properties:
+              key_request:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uint64
+                  creator:
+                    type: string
+                  space_id:
+                    type: string
+                    format: uint64
+                  keychain_id:
+                    type: string
+                    format: uint64
+                  key_type:
+                    type: string
+                    enum:
+                      - KEY_TYPE_UNSPECIFIED
+                      - KEY_TYPE_ECDSA_SECP256K1
+                      - KEY_TYPE_EDDSA_ED25519
+                    default: KEY_TYPE_UNSPECIFIED
+                    description: >-
+                      KeyType indicates what crypto scheme will be used by this
+                      key (e.g.
+
+                      ECDSA). Its public key will be one of the specified type.
+
+                       - KEY_TYPE_UNSPECIFIED: The key type is missing.
+                       - KEY_TYPE_ECDSA_SECP256K1: The key is an ECDSA secp256k1 key.
+                       - KEY_TYPE_EDDSA_ED25519: The key is an EdDSA Ed25519 key.
+                  status:
+                    type: string
+                    enum:
+                      - KEY_REQUEST_STATUS_UNSPECIFIED
+                      - KEY_REQUEST_STATUS_PENDING
+                      - KEY_REQUEST_STATUS_FULFILLED
+                      - KEY_REQUEST_STATUS_REJECTED
+                    default: KEY_REQUEST_STATUS_UNSPECIFIED
+                    description: >-
+                      KeyRequestStatus indicates the status of a key request.
+
+                      A request starts as "pending", waiting to be picked up.
+                      Then it can move to
+
+                      either "approved" or "rejected", depending on the decision
+                      of the keychain.
+
+                       - KEY_REQUEST_STATUS_UNSPECIFIED: The request is missing the status field.
+                       - KEY_REQUEST_STATUS_PENDING: The request is waiting to be fulfilled. This is the initial state of a
+                      request.
+                       - KEY_REQUEST_STATUS_FULFILLED: The request was fulfilled. This is a final state for a request.
+                       - KEY_REQUEST_STATUS_REJECTED: The request was rejected. This is a final state for a request.
+                  reject_reason:
+                    type: string
+                  intent_id:
+                    type: string
+                    format: uint64
+                    description: >-
+                      IntentId is the ID of the intent that the resulting Key
+                      will use.
+        default:
+          description: An unexpected error response.
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+              message:
+                type: string
+              details:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    '@type':
+                      type: string
+                  additionalProperties: {}
+      parameters:
+        - name: id
+          in: query
+          required: false
+          type: string
+          format: uint64
+      tags:
+        - Query
+  /warden/warden/v1beta2/key_requests:
+    get:
+      summary: Queries a list of KeyRequests items.
+      operationId: WardenWardenV1Beta2Query_KeyRequests
+      responses:
+        '200':
+          description: A successful response.
+          schema:
+            type: object
+            properties:
+              pagination:
+                type: object
+                properties:
+                  next_key:
+                    type: string
+                    format: byte
+                    description: |-
+                      next_key is the key to be passed to PageRequest.key to
+                      query the next page most efficiently. It will be empty if
+                      there are no more results.
+                  total:
+                    type: string
+                    format: uint64
+                    title: >-
+                      total is total number of results available if
+                      PageRequest.count_total
+
+                      was set, its value is undefined otherwise
+                description: >-
+                  PageResponse is to be embedded in gRPC response messages where
+                  the
+
+                  corresponding request message has used PageRequest.
+
+                   message SomeResponse {
+                           repeated Bar results = 1;
+                           PageResponse page = 2;
+                   }
+              key_requests:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      format: uint64
+                    creator:
+                      type: string
+                    space_id:
+                      type: string
+                      format: uint64
+                    keychain_id:
+                      type: string
+                      format: uint64
+                    key_type:
+                      type: string
+                      enum:
+                        - KEY_TYPE_UNSPECIFIED
+                        - KEY_TYPE_ECDSA_SECP256K1
+                        - KEY_TYPE_EDDSA_ED25519
+                      default: KEY_TYPE_UNSPECIFIED
+                      description: >-
+                        KeyType indicates what crypto scheme will be used by
+                        this key (e.g.
+
+                        ECDSA). Its public key will be one of the specified
+                        type.
+
+                         - KEY_TYPE_UNSPECIFIED: The key type is missing.
+                         - KEY_TYPE_ECDSA_SECP256K1: The key is an ECDSA secp256k1 key.
+                         - KEY_TYPE_EDDSA_ED25519: The key is an EdDSA Ed25519 key.
+                    status:
+                      type: string
+                      enum:
+                        - KEY_REQUEST_STATUS_UNSPECIFIED
+                        - KEY_REQUEST_STATUS_PENDING
+                        - KEY_REQUEST_STATUS_FULFILLED
+                        - KEY_REQUEST_STATUS_REJECTED
+                      default: KEY_REQUEST_STATUS_UNSPECIFIED
+                      description: >-
+                        KeyRequestStatus indicates the status of a key request.
+
+                        A request starts as "pending", waiting to be picked up.
+                        Then it can move to
+
+                        either "approved" or "rejected", depending on the
+                        decision of the keychain.
+
+                         - KEY_REQUEST_STATUS_UNSPECIFIED: The request is missing the status field.
+                         - KEY_REQUEST_STATUS_PENDING: The request is waiting to be fulfilled. This is the initial state of a
+                        request.
+                         - KEY_REQUEST_STATUS_FULFILLED: The request was fulfilled. This is a final state for a request.
+                         - KEY_REQUEST_STATUS_REJECTED: The request was rejected. This is a final state for a request.
+                    reject_reason:
+                      type: string
+                    intent_id:
+                      type: string
+                      format: uint64
+                      description: >-
+                        IntentId is the ID of the intent that the resulting Key
+                        will use.
+        default:
+          description: An unexpected error response.
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+              message:
+                type: string
+              details:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    '@type':
+                      type: string
+                  additionalProperties: {}
+      parameters:
+        - name: pagination.key
+          description: |-
+            key is a value returned in PageResponse.next_key to begin
+            querying the next page most efficiently. Only one of offset or key
+            should be set.
+          in: query
+          required: false
+          type: string
+          format: byte
+        - name: pagination.offset
+          description: >-
+            offset is a numeric offset that can be used when key is unavailable.
+
+            It is less efficient than using key. Only one of offset or key
+            should
+
+            be set.
+          in: query
+          required: false
+          type: string
+          format: uint64
+        - name: pagination.limit
+          description: >-
+            limit is the total number of results to be returned in the result
+            page.
+
+            If left empty it will default to a value to be set by each app.
+          in: query
+          required: false
+          type: string
+          format: uint64
+        - name: pagination.count_total
+          description: >-
+            count_total is set to true  to indicate that the result set should
+            include
+
+            a count of the total number of items available for pagination in
+            UIs.
+
+            count_total is only respected when offset is used. It is ignored
+            when key
+
+            is set.
+          in: query
+          required: false
+          type: boolean
+        - name: pagination.reverse
+          description: >-
+            reverse is set to true if results are to be returned in the
+            descending order.
+
+
+            Since: cosmos-sdk 0.43
+          in: query
+          required: false
+          type: boolean
+        - name: keychain_id
+          in: query
+          required: false
+          type: string
+          format: uint64
+        - name: status
+          description: |-
+            Optional
+
+             - KEY_REQUEST_STATUS_UNSPECIFIED: The request is missing the status field.
+             - KEY_REQUEST_STATUS_PENDING: The request is waiting to be fulfilled. This is the initial state of a
+            request.
+             - KEY_REQUEST_STATUS_FULFILLED: The request was fulfilled. This is a final state for a request.
+             - KEY_REQUEST_STATUS_REJECTED: The request was rejected. This is a final state for a request.
+          in: query
+          required: false
+          type: string
+          enum:
+            - KEY_REQUEST_STATUS_UNSPECIFIED
+            - KEY_REQUEST_STATUS_PENDING
+            - KEY_REQUEST_STATUS_FULFILLED
+            - KEY_REQUEST_STATUS_REJECTED
+          default: KEY_REQUEST_STATUS_UNSPECIFIED
+        - name: space_id
+          in: query
+          required: false
+          type: string
+          format: uint64
+      tags:
+        - Query
+  /warden/warden/v1beta2/keychain_by_id:
+    get:
+      summary: Queries a keychain by its id.
+      operationId: WardenWardenV1Beta2Query_KeychainById
+      responses:
+        '200':
+          description: A successful response.
+          schema:
+            type: object
+            properties:
+              keychain:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uint64
+                  creator:
+                    type: string
+                  description:
+                    type: string
+                  admins:
+                    type: array
+                    items:
+                      type: string
+                  parties:
+                    type: array
+                    items:
+                      type: string
+                  admin_intent_id:
+                    type: string
+                    format: uint64
+                  fees:
+                    type: object
+                    properties:
+                      key_req:
+                        type: string
+                        format: int64
+                      sig_req:
+                        type: string
+                        format: int64
+                  is_active:
+                    type: boolean
+        default:
+          description: An unexpected error response.
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+              message:
+                type: string
+              details:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    '@type':
+                      type: string
+                  additionalProperties: {}
+      parameters:
+        - name: id
+          in: query
+          required: false
+          type: string
+          format: uint64
+      tags:
+        - Query
+  /warden/warden/v1beta2/keychains:
+    get:
+      summary: Queries a list of Keychains items.
+      operationId: WardenWardenV1Beta2Query_Keychains
+      responses:
+        '200':
+          description: A successful response.
+          schema:
+            type: object
+            properties:
+              pagination:
+                type: object
+                properties:
+                  next_key:
+                    type: string
+                    format: byte
+                    description: |-
+                      next_key is the key to be passed to PageRequest.key to
+                      query the next page most efficiently. It will be empty if
+                      there are no more results.
+                  total:
+                    type: string
+                    format: uint64
+                    title: >-
+                      total is total number of results available if
+                      PageRequest.count_total
+
+                      was set, its value is undefined otherwise
+                description: >-
+                  PageResponse is to be embedded in gRPC response messages where
+                  the
+
+                  corresponding request message has used PageRequest.
+
+                   message SomeResponse {
+                           repeated Bar results = 1;
+                           PageResponse page = 2;
+                   }
+              keychains:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      format: uint64
+                    creator:
+                      type: string
+                    description:
+                      type: string
+                    admins:
+                      type: array
+                      items:
+                        type: string
+                    parties:
+                      type: array
+                      items:
+                        type: string
+                    admin_intent_id:
+                      type: string
+                      format: uint64
+                    fees:
+                      type: object
+                      properties:
+                        key_req:
+                          type: string
+                          format: int64
+                        sig_req:
+                          type: string
+                          format: int64
+                    is_active:
+                      type: boolean
+        default:
+          description: An unexpected error response.
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+              message:
+                type: string
+              details:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    '@type':
+                      type: string
+                  additionalProperties: {}
+      parameters:
+        - name: pagination.key
+          description: |-
+            key is a value returned in PageResponse.next_key to begin
+            querying the next page most efficiently. Only one of offset or key
+            should be set.
+          in: query
+          required: false
+          type: string
+          format: byte
+        - name: pagination.offset
+          description: >-
+            offset is a numeric offset that can be used when key is unavailable.
+
+            It is less efficient than using key. Only one of offset or key
+            should
+
+            be set.
+          in: query
+          required: false
+          type: string
+          format: uint64
+        - name: pagination.limit
+          description: >-
+            limit is the total number of results to be returned in the result
+            page.
+
+            If left empty it will default to a value to be set by each app.
+          in: query
+          required: false
+          type: string
+          format: uint64
+        - name: pagination.count_total
+          description: >-
+            count_total is set to true  to indicate that the result set should
+            include
+
+            a count of the total number of items available for pagination in
+            UIs.
+
+            count_total is only respected when offset is used. It is ignored
+            when key
+
+            is set.
+          in: query
+          required: false
+          type: boolean
+        - name: pagination.reverse
+          description: >-
+            reverse is set to true if results are to be returned in the
+            descending order.
+
+
+            Since: cosmos-sdk 0.43
+          in: query
+          required: false
+          type: boolean
+      tags:
+        - Query
+  /warden/warden/v1beta2/keys:
+    get:
+      summary: Queries a list of Keys items.
+      operationId: WardenWardenV1Beta2Query_AllKeys
+      responses:
+        '200':
+          description: A successful response.
+          schema:
+            type: object
+            properties:
+              pagination:
+                type: object
+                properties:
+                  next_key:
+                    type: string
+                    format: byte
+                    description: |-
+                      next_key is the key to be passed to PageRequest.key to
+                      query the next page most efficiently. It will be empty if
+                      there are no more results.
+                  total:
+                    type: string
+                    format: uint64
+                    title: >-
+                      total is total number of results available if
+                      PageRequest.count_total
+
+                      was set, its value is undefined otherwise
+                description: >-
+                  PageResponse is to be embedded in gRPC response messages where
+                  the
+
+                  corresponding request message has used PageRequest.
+
+                   message SomeResponse {
+                           repeated Bar results = 1;
+                           PageResponse page = 2;
+                   }
+              keys:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    key:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uint64
+                        space_id:
+                          type: string
+                          format: uint64
+                        keychain_id:
+                          type: string
+                          format: uint64
+                        type:
+                          type: string
+                          enum:
+                            - KEY_TYPE_UNSPECIFIED
+                            - KEY_TYPE_ECDSA_SECP256K1
+                            - KEY_TYPE_EDDSA_ED25519
+                          default: KEY_TYPE_UNSPECIFIED
+                          description: >-
+                            KeyType indicates what crypto scheme will be used by
+                            this key (e.g.
+
+                            ECDSA). Its public key will be one of the specified
+                            type.
+
+                             - KEY_TYPE_UNSPECIFIED: The key type is missing.
+                             - KEY_TYPE_ECDSA_SECP256K1: The key is an ECDSA secp256k1 key.
+                             - KEY_TYPE_EDDSA_ED25519: The key is an EdDSA Ed25519 key.
+                        public_key:
+                          type: string
+                          format: byte
+                        intent_id:
+                          type: string
+                          format: uint64
+                          description: >-
+                            IntentId is the ID of the intent that will need to
+                            be satisfied for using
+
+                            this key to sign data.
+
+                            If this is not set, the key will use the signing
+                            intent of the Space.
+                    addresses:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          address:
+                            type: string
+                          type:
+                            type: string
+                            enum:
+                              - ADDRESS_TYPE_UNSPECIFIED
+                              - ADDRESS_TYPE_ETHEREUM
+                              - ADDRESS_TYPE_OSMOSIS
+                            default: ADDRESS_TYPE_UNSPECIFIED
+                            description: |2-
+                               - ADDRESS_TYPE_UNSPECIFIED: The address type is missing.
+                               - ADDRESS_TYPE_ETHEREUM: Ethereum address type (e.g. 0x71C7656EC7ab88b098defB751B7401B5f6d8976F).
+                               - ADDRESS_TYPE_OSMOSIS: Osmosis address type (e.g. osmo10kmgv5gzygnecf46x092ecfe5xcvvv9rlt823n).
+        default:
+          description: An unexpected error response.
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+              message:
+                type: string
+              details:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    '@type':
+                      type: string
+                  additionalProperties: {}
+      parameters:
+        - name: pagination.key
+          description: |-
+            key is a value returned in PageResponse.next_key to begin
+            querying the next page most efficiently. Only one of offset or key
+            should be set.
+          in: query
+          required: false
+          type: string
+          format: byte
+        - name: pagination.offset
+          description: >-
+            offset is a numeric offset that can be used when key is unavailable.
+
+            It is less efficient than using key. Only one of offset or key
+            should
+
+            be set.
+          in: query
+          required: false
+          type: string
+          format: uint64
+        - name: pagination.limit
+          description: >-
+            limit is the total number of results to be returned in the result
+            page.
+
+            If left empty it will default to a value to be set by each app.
+          in: query
+          required: false
+          type: string
+          format: uint64
+        - name: pagination.count_total
+          description: >-
+            count_total is set to true  to indicate that the result set should
+            include
+
+            a count of the total number of items available for pagination in
+            UIs.
+
+            count_total is only respected when offset is used. It is ignored
+            when key
+
+            is set.
+          in: query
+          required: false
+          type: boolean
+        - name: pagination.reverse
+          description: >-
+            reverse is set to true if results are to be returned in the
+            descending order.
+
+
+            Since: cosmos-sdk 0.43
+          in: query
+          required: false
+          type: boolean
+        - name: derive_addresses
+          description: |-
+            Optional
+
+             - ADDRESS_TYPE_UNSPECIFIED: The address type is missing.
+             - ADDRESS_TYPE_ETHEREUM: Ethereum address type (e.g. 0x71C7656EC7ab88b098defB751B7401B5f6d8976F).
+             - ADDRESS_TYPE_OSMOSIS: Osmosis address type (e.g. osmo10kmgv5gzygnecf46x092ecfe5xcvvv9rlt823n).
+          in: query
+          required: false
+          type: array
+          items:
+            type: string
+            enum:
+              - ADDRESS_TYPE_UNSPECIFIED
+              - ADDRESS_TYPE_ETHEREUM
+              - ADDRESS_TYPE_OSMOSIS
+          collectionFormat: multi
+      tags:
+        - Query
+  /warden/warden/v1beta2/keys_by_space_id:
+    get:
+      summary: Queries a list of Keys items by their Space ID.
+      operationId: WardenWardenV1Beta2Query_KeysBySpaceId
+      responses:
+        '200':
+          description: A successful response.
+          schema:
+            type: object
+            properties:
+              pagination:
+                type: object
+                properties:
+                  next_key:
+                    type: string
+                    format: byte
+                    description: |-
+                      next_key is the key to be passed to PageRequest.key to
+                      query the next page most efficiently. It will be empty if
+                      there are no more results.
+                  total:
+                    type: string
+                    format: uint64
+                    title: >-
+                      total is total number of results available if
+                      PageRequest.count_total
+
+                      was set, its value is undefined otherwise
+                description: >-
+                  PageResponse is to be embedded in gRPC response messages where
+                  the
+
+                  corresponding request message has used PageRequest.
+
+                   message SomeResponse {
+                           repeated Bar results = 1;
+                           PageResponse page = 2;
+                   }
+              keys:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    key:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uint64
+                        space_id:
+                          type: string
+                          format: uint64
+                        keychain_id:
+                          type: string
+                          format: uint64
+                        type:
+                          type: string
+                          enum:
+                            - KEY_TYPE_UNSPECIFIED
+                            - KEY_TYPE_ECDSA_SECP256K1
+                            - KEY_TYPE_EDDSA_ED25519
+                          default: KEY_TYPE_UNSPECIFIED
+                          description: >-
+                            KeyType indicates what crypto scheme will be used by
+                            this key (e.g.
+
+                            ECDSA). Its public key will be one of the specified
+                            type.
+
+                             - KEY_TYPE_UNSPECIFIED: The key type is missing.
+                             - KEY_TYPE_ECDSA_SECP256K1: The key is an ECDSA secp256k1 key.
+                             - KEY_TYPE_EDDSA_ED25519: The key is an EdDSA Ed25519 key.
+                        public_key:
+                          type: string
+                          format: byte
+                        intent_id:
+                          type: string
+                          format: uint64
+                          description: >-
+                            IntentId is the ID of the intent that will need to
+                            be satisfied for using
+
+                            this key to sign data.
+
+                            If this is not set, the key will use the signing
+                            intent of the Space.
+                    addresses:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          address:
+                            type: string
+                          type:
+                            type: string
+                            enum:
+                              - ADDRESS_TYPE_UNSPECIFIED
+                              - ADDRESS_TYPE_ETHEREUM
+                              - ADDRESS_TYPE_OSMOSIS
+                            default: ADDRESS_TYPE_UNSPECIFIED
+                            description: |2-
+                               - ADDRESS_TYPE_UNSPECIFIED: The address type is missing.
+                               - ADDRESS_TYPE_ETHEREUM: Ethereum address type (e.g. 0x71C7656EC7ab88b098defB751B7401B5f6d8976F).
+                               - ADDRESS_TYPE_OSMOSIS: Osmosis address type (e.g. osmo10kmgv5gzygnecf46x092ecfe5xcvvv9rlt823n).
+        default:
+          description: An unexpected error response.
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+              message:
+                type: string
+              details:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    '@type':
+                      type: string
+                  additionalProperties: {}
+      parameters:
+        - name: pagination.key
+          description: |-
+            key is a value returned in PageResponse.next_key to begin
+            querying the next page most efficiently. Only one of offset or key
+            should be set.
+          in: query
+          required: false
+          type: string
+          format: byte
+        - name: pagination.offset
+          description: >-
+            offset is a numeric offset that can be used when key is unavailable.
+
+            It is less efficient than using key. Only one of offset or key
+            should
+
+            be set.
+          in: query
+          required: false
+          type: string
+          format: uint64
+        - name: pagination.limit
+          description: >-
+            limit is the total number of results to be returned in the result
+            page.
+
+            If left empty it will default to a value to be set by each app.
+          in: query
+          required: false
+          type: string
+          format: uint64
+        - name: pagination.count_total
+          description: >-
+            count_total is set to true  to indicate that the result set should
+            include
+
+            a count of the total number of items available for pagination in
+            UIs.
+
+            count_total is only respected when offset is used. It is ignored
+            when key
+
+            is set.
+          in: query
+          required: false
+          type: boolean
+        - name: pagination.reverse
+          description: >-
+            reverse is set to true if results are to be returned in the
+            descending order.
+
+
+            Since: cosmos-sdk 0.43
+          in: query
+          required: false
+          type: boolean
+        - name: space_id
+          in: query
+          required: false
+          type: string
+          format: uint64
+        - name: derive_addresses
+          description: |-
+            Optional
+
+             - ADDRESS_TYPE_UNSPECIFIED: The address type is missing.
+             - ADDRESS_TYPE_ETHEREUM: Ethereum address type (e.g. 0x71C7656EC7ab88b098defB751B7401B5f6d8976F).
+             - ADDRESS_TYPE_OSMOSIS: Osmosis address type (e.g. osmo10kmgv5gzygnecf46x092ecfe5xcvvv9rlt823n).
+          in: query
+          required: false
+          type: array
+          items:
+            type: string
+            enum:
+              - ADDRESS_TYPE_UNSPECIFIED
+              - ADDRESS_TYPE_ETHEREUM
+              - ADDRESS_TYPE_OSMOSIS
+          collectionFormat: multi
+      tags:
+        - Query
+  /warden/warden/v1beta2/params:
+    get:
+      summary: Parameters queries the parameters of the module.
+      operationId: WardenWardenV1Beta2Query_Params
+      responses:
+        '200':
+          description: A successful response.
+          schema:
+            type: object
+            properties:
+              params:
+                description: params holds all the parameters of this module.
+                type: object
+            description: >-
+              QueryParamsResponse is response type for the Query/Params RPC
+              method.
+        default:
+          description: An unexpected error response.
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+              message:
+                type: string
+              details:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    '@type':
+                      type: string
+                  additionalProperties: {}
+      tags:
+        - Query
+  /warden/warden/v1beta2/signature_pb_request_by_id:
+    get:
+      summary: Queries a single SignatureRequest by its id.
+      operationId: WardenWardenV1Beta2Query_SignatureRequestById
+      responses:
+        '200':
+          description: A successful response.
+          schema:
+            type: object
+            properties:
+              sign_request:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uint64
+                  creator:
+                    type: string
+                  key_id:
+                    type: string
+                    format: uint64
+                  data_for_signing:
+                    type: string
+                    format: byte
+                  status:
+                    type: string
+                    enum:
+                      - SIGN_REQUEST_STATUS_UNSPECIFIED
+                      - SIGN_REQUEST_STATUS_PENDING
+                      - SIGN_REQUEST_STATUS_FULFILLED
+                      - SIGN_REQUEST_STATUS_REJECTED
+                    default: SIGN_REQUEST_STATUS_UNSPECIFIED
+                    description: >-
+                      SignRequestStatus indicates the status of a signature
+                      request.
+
+                      A request starts as "pending", waiting to be picked up.
+                      Then it can move to
+
+                      either "approved" or "rejected", depending on the decision
+                      of the keychain.
+
+                       - SIGN_REQUEST_STATUS_UNSPECIFIED: The request is missing the status field.
+                       - SIGN_REQUEST_STATUS_PENDING: The request is waiting to be fulfilled. This is the initial state of a
+                      request.
+                       - SIGN_REQUEST_STATUS_FULFILLED: The request was fulfilled. This is a final state for a request.
+                       - SIGN_REQUEST_STATUS_REJECTED: The request was rejected. This is a final state for a request.
+                  signed_data:
+                    type: string
+                    format: byte
+                  reject_reason:
+                    type: string
+        default:
+          description: An unexpected error response.
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+              message:
+                type: string
+              details:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    '@type':
+                      type: string
+                  additionalProperties: {}
+      parameters:
+        - name: id
+          in: query
+          required: false
+          type: string
+          format: uint64
+      tags:
+        - Query
+  /warden/warden/v1beta2/space_by_address:
+    get:
+      summary: Queries a space by its id.
+      operationId: WardenWardenV1Beta2Query_SpaceById
+      responses:
+        '200':
+          description: A successful response.
+          schema:
+            type: object
+            properties:
+              space:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uint64
+                  creator:
+                    type: string
+                  owners:
+                    type: array
+                    items:
+                      type: string
+                  admin_intent_id:
+                    type: string
+                    format: uint64
+                    description: >-
+                      Optional ID of the intent to be applied to every *admin*
+                      operation.
+
+                      If not specified, the default intent is used.
+
+
+                      Admin operations are:
+
+                      - warden.warden.Msg.AddSpaceOwner
+
+                      - warden.warden.Msg.RemoveSpaceOwner
+
+
+                      The default intent is to allow any operation when at least
+                      one of its
+
+                      owner approves it.
+                  sign_intent_id:
+                    type: string
+                    format: uint64
+                    description: >-
+                      Optional ID of the intent to be applied to every *sign*
+                      operation.
+
+                      If not specified, the default intent is used.
+
+
+                      Sign operations are:
+
+                      - warden.warden.Msg.NewKeyRequest
+
+                      - warden.warden.Msg.NewSignTransactionRequest
+
+                      - warden.warden.Msg.NewSignatureRequest
+
+                      - warden.warden.Msg.NewWalletRequest
+
+
+                      The default intent is to allow any operation when at least
+                      one of its
+
+                      owner approves it.
+                description: >-
+                  Space is a collection of users (called owners) that manages a
+                  set of keys.
+        default:
+          description: An unexpected error response.
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+              message:
+                type: string
+              details:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    '@type':
+                      type: string
+                  additionalProperties: {}
+      parameters:
+        - name: id
+          in: query
+          required: false
+          type: string
+          format: uint64
+      tags:
+        - Query
+  /warden/warden/v1beta2/spaces:
+    get:
+      summary: Queries a list of Spaces items.
+      operationId: WardenWardenV1Beta2Query_Spaces
+      responses:
+        '200':
+          description: A successful response.
+          schema:
+            type: object
+            properties:
+              pagination:
+                type: object
+                properties:
+                  next_key:
+                    type: string
+                    format: byte
+                    description: |-
+                      next_key is the key to be passed to PageRequest.key to
+                      query the next page most efficiently. It will be empty if
+                      there are no more results.
+                  total:
+                    type: string
+                    format: uint64
+                    title: >-
+                      total is total number of results available if
+                      PageRequest.count_total
+
+                      was set, its value is undefined otherwise
+                description: >-
+                  PageResponse is to be embedded in gRPC response messages where
+                  the
+
+                  corresponding request message has used PageRequest.
+
+                   message SomeResponse {
+                           repeated Bar results = 1;
+                           PageResponse page = 2;
+                   }
+              spaces:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      format: uint64
+                    creator:
+                      type: string
+                    owners:
+                      type: array
+                      items:
+                        type: string
+                    admin_intent_id:
+                      type: string
+                      format: uint64
+                      description: >-
+                        Optional ID of the intent to be applied to every *admin*
+                        operation.
+
+                        If not specified, the default intent is used.
+
+
+                        Admin operations are:
+
+                        - warden.warden.Msg.AddSpaceOwner
+
+                        - warden.warden.Msg.RemoveSpaceOwner
+
+
+                        The default intent is to allow any operation when at
+                        least one of its
+
+                        owner approves it.
+                    sign_intent_id:
+                      type: string
+                      format: uint64
+                      description: >-
+                        Optional ID of the intent to be applied to every *sign*
+                        operation.
+
+                        If not specified, the default intent is used.
+
+
+                        Sign operations are:
+
+                        - warden.warden.Msg.NewKeyRequest
+
+                        - warden.warden.Msg.NewSignTransactionRequest
+
+                        - warden.warden.Msg.NewSignatureRequest
+
+                        - warden.warden.Msg.NewWalletRequest
+
+
+                        The default intent is to allow any operation when at
+                        least one of its
+
+                        owner approves it.
+                  description: >-
+                    Space is a collection of users (called owners) that manages
+                    a set of keys.
+        default:
+          description: An unexpected error response.
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+              message:
+                type: string
+              details:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    '@type':
+                      type: string
+                  additionalProperties: {}
+      parameters:
+        - name: pagination.key
+          description: |-
+            key is a value returned in PageResponse.next_key to begin
+            querying the next page most efficiently. Only one of offset or key
+            should be set.
+          in: query
+          required: false
+          type: string
+          format: byte
+        - name: pagination.offset
+          description: >-
+            offset is a numeric offset that can be used when key is unavailable.
+
+            It is less efficient than using key. Only one of offset or key
+            should
+
+            be set.
+          in: query
+          required: false
+          type: string
+          format: uint64
+        - name: pagination.limit
+          description: >-
+            limit is the total number of results to be returned in the result
+            page.
+
+            If left empty it will default to a value to be set by each app.
+          in: query
+          required: false
+          type: string
+          format: uint64
+        - name: pagination.count_total
+          description: >-
+            count_total is set to true  to indicate that the result set should
+            include
+
+            a count of the total number of items available for pagination in
+            UIs.
+
+            count_total is only respected when offset is used. It is ignored
+            when key
+
+            is set.
+          in: query
+          required: false
+          type: boolean
+        - name: pagination.reverse
+          description: >-
+            reverse is set to true if results are to be returned in the
+            descending order.
+
+
+            Since: cosmos-sdk 0.43
+          in: query
+          required: false
+          type: boolean
+      tags:
+        - Query
+  /warden/warden/v1beta2/spaces_by_owner:
+    get:
+      summary: Queries a list of Spaces that has the specified owner.
+      operationId: WardenWardenV1Beta2Query_SpacesByOwner
+      responses:
+        '200':
+          description: A successful response.
+          schema:
+            type: object
+            properties:
+              pagination:
+                type: object
+                properties:
+                  next_key:
+                    type: string
+                    format: byte
+                    description: |-
+                      next_key is the key to be passed to PageRequest.key to
+                      query the next page most efficiently. It will be empty if
+                      there are no more results.
+                  total:
+                    type: string
+                    format: uint64
+                    title: >-
+                      total is total number of results available if
+                      PageRequest.count_total
+
+                      was set, its value is undefined otherwise
+                description: >-
+                  PageResponse is to be embedded in gRPC response messages where
+                  the
+
+                  corresponding request message has used PageRequest.
+
+                   message SomeResponse {
+                           repeated Bar results = 1;
+                           PageResponse page = 2;
+                   }
+              spaces:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      format: uint64
+                    creator:
+                      type: string
+                    owners:
+                      type: array
+                      items:
+                        type: string
+                    admin_intent_id:
+                      type: string
+                      format: uint64
+                      description: >-
+                        Optional ID of the intent to be applied to every *admin*
+                        operation.
+
+                        If not specified, the default intent is used.
+
+
+                        Admin operations are:
+
+                        - warden.warden.Msg.AddSpaceOwner
+
+                        - warden.warden.Msg.RemoveSpaceOwner
+
+
+                        The default intent is to allow any operation when at
+                        least one of its
+
+                        owner approves it.
+                    sign_intent_id:
+                      type: string
+                      format: uint64
+                      description: >-
+                        Optional ID of the intent to be applied to every *sign*
+                        operation.
+
+                        If not specified, the default intent is used.
+
+
+                        Sign operations are:
+
+                        - warden.warden.Msg.NewKeyRequest
+
+                        - warden.warden.Msg.NewSignTransactionRequest
+
+                        - warden.warden.Msg.NewSignatureRequest
+
+                        - warden.warden.Msg.NewWalletRequest
+
+
+                        The default intent is to allow any operation when at
+                        least one of its
+
+                        owner approves it.
+                  description: >-
+                    Space is a collection of users (called owners) that manages
+                    a set of keys.
+        default:
+          description: An unexpected error response.
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+              message:
+                type: string
+              details:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    '@type':
+                      type: string
+                  additionalProperties: {}
+      parameters:
+        - name: pagination.key
+          description: |-
+            key is a value returned in PageResponse.next_key to begin
+            querying the next page most efficiently. Only one of offset or key
+            should be set.
+          in: query
+          required: false
+          type: string
+          format: byte
+        - name: pagination.offset
+          description: >-
+            offset is a numeric offset that can be used when key is unavailable.
+
+            It is less efficient than using key. Only one of offset or key
+            should
+
+            be set.
+          in: query
+          required: false
+          type: string
+          format: uint64
+        - name: pagination.limit
+          description: >-
+            limit is the total number of results to be returned in the result
+            page.
+
+            If left empty it will default to a value to be set by each app.
+          in: query
+          required: false
+          type: string
+          format: uint64
+        - name: pagination.count_total
+          description: >-
+            count_total is set to true  to indicate that the result set should
+            include
+
+            a count of the total number of items available for pagination in
+            UIs.
+
+            count_total is only respected when offset is used. It is ignored
+            when key
+
+            is set.
+          in: query
+          required: false
+          type: boolean
+        - name: pagination.reverse
+          description: >-
+            reverse is set to true if results are to be returned in the
+            descending order.
+
+
+            Since: cosmos-sdk 0.43
+          in: query
+          required: false
+          type: boolean
+        - name: owner
+          in: query
+          required: false
+          type: string
+      tags:
+        - Query
 definitions:
   cosmos.auth.v1beta1.MsgUpdateParams:
     type: object
@@ -27870,7 +29660,7 @@ definitions:
       key_id:
         type: string
         format: uint64
-      data_for_signing:
+      input:
         type: string
         format: byte
       sign_method:
@@ -28057,6 +29847,10 @@ definitions:
       btl:
         type: string
         format: uint64
+      analyzers:
+        type: array
+        items:
+          type: string
   warden.warden.v1beta2.MsgNewSpace:
     type: object
     properties:
@@ -28245,3 +30039,1001 @@ definitions:
       request.
        - SIGN_REQUEST_STATUS_FULFILLED: The request was fulfilled. This is a final state for a request.
        - SIGN_REQUEST_STATUS_REJECTED: The request was rejected. This is a final state for a request.
+  cosmos.base.query.v1beta1.PageRequest:
+    type: object
+    properties:
+      key:
+        type: string
+        format: byte
+        description: |-
+          key is a value returned in PageResponse.next_key to begin
+          querying the next page most efficiently. Only one of offset or key
+          should be set.
+      offset:
+        type: string
+        format: uint64
+        description: |-
+          offset is a numeric offset that can be used when key is unavailable.
+          It is less efficient than using key. Only one of offset or key should
+          be set.
+      limit:
+        type: string
+        format: uint64
+        description: >-
+          limit is the total number of results to be returned in the result
+          page.
+
+          If left empty it will default to a value to be set by each app.
+      count_total:
+        type: boolean
+        description: >-
+          count_total is set to true  to indicate that the result set should
+          include
+
+          a count of the total number of items available for pagination in UIs.
+
+          count_total is only respected when offset is used. It is ignored when
+          key
+
+          is set.
+      reverse:
+        type: boolean
+        description: >-
+          reverse is set to true if results are to be returned in the descending
+          order.
+
+
+          Since: cosmos-sdk 0.43
+    description: |-
+      message SomeRequest {
+               Foo some_parameter = 1;
+               PageRequest pagination = 2;
+       }
+    title: |-
+      PageRequest is to be embedded in gRPC request messages for efficient
+      pagination. Ex:
+  cosmos.base.query.v1beta1.PageResponse:
+    type: object
+    properties:
+      next_key:
+        type: string
+        format: byte
+        description: |-
+          next_key is the key to be passed to PageRequest.key to
+          query the next page most efficiently. It will be empty if
+          there are no more results.
+      total:
+        type: string
+        format: uint64
+        title: |-
+          total is total number of results available if PageRequest.count_total
+          was set, its value is undefined otherwise
+    description: |-
+      PageResponse is to be embedded in gRPC response messages where the
+      corresponding request message has used PageRequest.
+
+       message SomeResponse {
+               repeated Bar results = 1;
+               PageResponse page = 2;
+       }
+  warden.warden.v1beta2.AddressResponse:
+    type: object
+    properties:
+      address:
+        type: string
+      type:
+        type: string
+        enum:
+          - ADDRESS_TYPE_UNSPECIFIED
+          - ADDRESS_TYPE_ETHEREUM
+          - ADDRESS_TYPE_OSMOSIS
+        default: ADDRESS_TYPE_UNSPECIFIED
+        description: |2-
+           - ADDRESS_TYPE_UNSPECIFIED: The address type is missing.
+           - ADDRESS_TYPE_ETHEREUM: Ethereum address type (e.g. 0x71C7656EC7ab88b098defB751B7401B5f6d8976F).
+           - ADDRESS_TYPE_OSMOSIS: Osmosis address type (e.g. osmo10kmgv5gzygnecf46x092ecfe5xcvvv9rlt823n).
+  warden.warden.v1beta2.AddressType:
+    type: string
+    enum:
+      - ADDRESS_TYPE_UNSPECIFIED
+      - ADDRESS_TYPE_ETHEREUM
+      - ADDRESS_TYPE_OSMOSIS
+    default: ADDRESS_TYPE_UNSPECIFIED
+    description: |2-
+       - ADDRESS_TYPE_UNSPECIFIED: The address type is missing.
+       - ADDRESS_TYPE_ETHEREUM: Ethereum address type (e.g. 0x71C7656EC7ab88b098defB751B7401B5f6d8976F).
+       - ADDRESS_TYPE_OSMOSIS: Osmosis address type (e.g. osmo10kmgv5gzygnecf46x092ecfe5xcvvv9rlt823n).
+  warden.warden.v1beta2.Key:
+    type: object
+    properties:
+      id:
+        type: string
+        format: uint64
+      space_id:
+        type: string
+        format: uint64
+      keychain_id:
+        type: string
+        format: uint64
+      type:
+        type: string
+        enum:
+          - KEY_TYPE_UNSPECIFIED
+          - KEY_TYPE_ECDSA_SECP256K1
+          - KEY_TYPE_EDDSA_ED25519
+        default: KEY_TYPE_UNSPECIFIED
+        description: |-
+          KeyType indicates what crypto scheme will be used by this key (e.g.
+          ECDSA). Its public key will be one of the specified type.
+
+           - KEY_TYPE_UNSPECIFIED: The key type is missing.
+           - KEY_TYPE_ECDSA_SECP256K1: The key is an ECDSA secp256k1 key.
+           - KEY_TYPE_EDDSA_ED25519: The key is an EdDSA Ed25519 key.
+      public_key:
+        type: string
+        format: byte
+      intent_id:
+        type: string
+        format: uint64
+        description: >-
+          IntentId is the ID of the intent that will need to be satisfied for
+          using
+
+          this key to sign data.
+
+          If this is not set, the key will use the signing intent of the Space.
+  warden.warden.v1beta2.KeyRequest:
+    type: object
+    properties:
+      id:
+        type: string
+        format: uint64
+      creator:
+        type: string
+      space_id:
+        type: string
+        format: uint64
+      keychain_id:
+        type: string
+        format: uint64
+      key_type:
+        type: string
+        enum:
+          - KEY_TYPE_UNSPECIFIED
+          - KEY_TYPE_ECDSA_SECP256K1
+          - KEY_TYPE_EDDSA_ED25519
+        default: KEY_TYPE_UNSPECIFIED
+        description: |-
+          KeyType indicates what crypto scheme will be used by this key (e.g.
+          ECDSA). Its public key will be one of the specified type.
+
+           - KEY_TYPE_UNSPECIFIED: The key type is missing.
+           - KEY_TYPE_ECDSA_SECP256K1: The key is an ECDSA secp256k1 key.
+           - KEY_TYPE_EDDSA_ED25519: The key is an EdDSA Ed25519 key.
+      status:
+        type: string
+        enum:
+          - KEY_REQUEST_STATUS_UNSPECIFIED
+          - KEY_REQUEST_STATUS_PENDING
+          - KEY_REQUEST_STATUS_FULFILLED
+          - KEY_REQUEST_STATUS_REJECTED
+        default: KEY_REQUEST_STATUS_UNSPECIFIED
+        description: >-
+          KeyRequestStatus indicates the status of a key request.
+
+          A request starts as "pending", waiting to be picked up. Then it can
+          move to
+
+          either "approved" or "rejected", depending on the decision of the
+          keychain.
+
+           - KEY_REQUEST_STATUS_UNSPECIFIED: The request is missing the status field.
+           - KEY_REQUEST_STATUS_PENDING: The request is waiting to be fulfilled. This is the initial state of a
+          request.
+           - KEY_REQUEST_STATUS_FULFILLED: The request was fulfilled. This is a final state for a request.
+           - KEY_REQUEST_STATUS_REJECTED: The request was rejected. This is a final state for a request.
+      reject_reason:
+        type: string
+      intent_id:
+        type: string
+        format: uint64
+        description: IntentId is the ID of the intent that the resulting Key will use.
+  warden.warden.v1beta2.Keychain:
+    type: object
+    properties:
+      id:
+        type: string
+        format: uint64
+      creator:
+        type: string
+      description:
+        type: string
+      admins:
+        type: array
+        items:
+          type: string
+      parties:
+        type: array
+        items:
+          type: string
+      admin_intent_id:
+        type: string
+        format: uint64
+      fees:
+        type: object
+        properties:
+          key_req:
+            type: string
+            format: int64
+          sig_req:
+            type: string
+            format: int64
+      is_active:
+        type: boolean
+  warden.warden.v1beta2.QueryKeyRequestByIdResponse:
+    type: object
+    properties:
+      key_request:
+        type: object
+        properties:
+          id:
+            type: string
+            format: uint64
+          creator:
+            type: string
+          space_id:
+            type: string
+            format: uint64
+          keychain_id:
+            type: string
+            format: uint64
+          key_type:
+            type: string
+            enum:
+              - KEY_TYPE_UNSPECIFIED
+              - KEY_TYPE_ECDSA_SECP256K1
+              - KEY_TYPE_EDDSA_ED25519
+            default: KEY_TYPE_UNSPECIFIED
+            description: >-
+              KeyType indicates what crypto scheme will be used by this key
+              (e.g.
+
+              ECDSA). Its public key will be one of the specified type.
+
+               - KEY_TYPE_UNSPECIFIED: The key type is missing.
+               - KEY_TYPE_ECDSA_SECP256K1: The key is an ECDSA secp256k1 key.
+               - KEY_TYPE_EDDSA_ED25519: The key is an EdDSA Ed25519 key.
+          status:
+            type: string
+            enum:
+              - KEY_REQUEST_STATUS_UNSPECIFIED
+              - KEY_REQUEST_STATUS_PENDING
+              - KEY_REQUEST_STATUS_FULFILLED
+              - KEY_REQUEST_STATUS_REJECTED
+            default: KEY_REQUEST_STATUS_UNSPECIFIED
+            description: >-
+              KeyRequestStatus indicates the status of a key request.
+
+              A request starts as "pending", waiting to be picked up. Then it
+              can move to
+
+              either "approved" or "rejected", depending on the decision of the
+              keychain.
+
+               - KEY_REQUEST_STATUS_UNSPECIFIED: The request is missing the status field.
+               - KEY_REQUEST_STATUS_PENDING: The request is waiting to be fulfilled. This is the initial state of a
+              request.
+               - KEY_REQUEST_STATUS_FULFILLED: The request was fulfilled. This is a final state for a request.
+               - KEY_REQUEST_STATUS_REJECTED: The request was rejected. This is a final state for a request.
+          reject_reason:
+            type: string
+          intent_id:
+            type: string
+            format: uint64
+            description: IntentId is the ID of the intent that the resulting Key will use.
+  warden.warden.v1beta2.QueryKeyRequestsResponse:
+    type: object
+    properties:
+      pagination:
+        type: object
+        properties:
+          next_key:
+            type: string
+            format: byte
+            description: |-
+              next_key is the key to be passed to PageRequest.key to
+              query the next page most efficiently. It will be empty if
+              there are no more results.
+          total:
+            type: string
+            format: uint64
+            title: >-
+              total is total number of results available if
+              PageRequest.count_total
+
+              was set, its value is undefined otherwise
+        description: |-
+          PageResponse is to be embedded in gRPC response messages where the
+          corresponding request message has used PageRequest.
+
+           message SomeResponse {
+                   repeated Bar results = 1;
+                   PageResponse page = 2;
+           }
+      key_requests:
+        type: array
+        items:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uint64
+            creator:
+              type: string
+            space_id:
+              type: string
+              format: uint64
+            keychain_id:
+              type: string
+              format: uint64
+            key_type:
+              type: string
+              enum:
+                - KEY_TYPE_UNSPECIFIED
+                - KEY_TYPE_ECDSA_SECP256K1
+                - KEY_TYPE_EDDSA_ED25519
+              default: KEY_TYPE_UNSPECIFIED
+              description: >-
+                KeyType indicates what crypto scheme will be used by this key
+                (e.g.
+
+                ECDSA). Its public key will be one of the specified type.
+
+                 - KEY_TYPE_UNSPECIFIED: The key type is missing.
+                 - KEY_TYPE_ECDSA_SECP256K1: The key is an ECDSA secp256k1 key.
+                 - KEY_TYPE_EDDSA_ED25519: The key is an EdDSA Ed25519 key.
+            status:
+              type: string
+              enum:
+                - KEY_REQUEST_STATUS_UNSPECIFIED
+                - KEY_REQUEST_STATUS_PENDING
+                - KEY_REQUEST_STATUS_FULFILLED
+                - KEY_REQUEST_STATUS_REJECTED
+              default: KEY_REQUEST_STATUS_UNSPECIFIED
+              description: >-
+                KeyRequestStatus indicates the status of a key request.
+
+                A request starts as "pending", waiting to be picked up. Then it
+                can move to
+
+                either "approved" or "rejected", depending on the decision of
+                the keychain.
+
+                 - KEY_REQUEST_STATUS_UNSPECIFIED: The request is missing the status field.
+                 - KEY_REQUEST_STATUS_PENDING: The request is waiting to be fulfilled. This is the initial state of a
+                request.
+                 - KEY_REQUEST_STATUS_FULFILLED: The request was fulfilled. This is a final state for a request.
+                 - KEY_REQUEST_STATUS_REJECTED: The request was rejected. This is a final state for a request.
+            reject_reason:
+              type: string
+            intent_id:
+              type: string
+              format: uint64
+              description: >-
+                IntentId is the ID of the intent that the resulting Key will
+                use.
+  warden.warden.v1beta2.QueryKeyResponse:
+    type: object
+    properties:
+      key:
+        type: object
+        properties:
+          id:
+            type: string
+            format: uint64
+          space_id:
+            type: string
+            format: uint64
+          keychain_id:
+            type: string
+            format: uint64
+          type:
+            type: string
+            enum:
+              - KEY_TYPE_UNSPECIFIED
+              - KEY_TYPE_ECDSA_SECP256K1
+              - KEY_TYPE_EDDSA_ED25519
+            default: KEY_TYPE_UNSPECIFIED
+            description: >-
+              KeyType indicates what crypto scheme will be used by this key
+              (e.g.
+
+              ECDSA). Its public key will be one of the specified type.
+
+               - KEY_TYPE_UNSPECIFIED: The key type is missing.
+               - KEY_TYPE_ECDSA_SECP256K1: The key is an ECDSA secp256k1 key.
+               - KEY_TYPE_EDDSA_ED25519: The key is an EdDSA Ed25519 key.
+          public_key:
+            type: string
+            format: byte
+          intent_id:
+            type: string
+            format: uint64
+            description: >-
+              IntentId is the ID of the intent that will need to be satisfied
+              for using
+
+              this key to sign data.
+
+              If this is not set, the key will use the signing intent of the
+              Space.
+      addresses:
+        type: array
+        items:
+          type: object
+          properties:
+            address:
+              type: string
+            type:
+              type: string
+              enum:
+                - ADDRESS_TYPE_UNSPECIFIED
+                - ADDRESS_TYPE_ETHEREUM
+                - ADDRESS_TYPE_OSMOSIS
+              default: ADDRESS_TYPE_UNSPECIFIED
+              description: |2-
+                 - ADDRESS_TYPE_UNSPECIFIED: The address type is missing.
+                 - ADDRESS_TYPE_ETHEREUM: Ethereum address type (e.g. 0x71C7656EC7ab88b098defB751B7401B5f6d8976F).
+                 - ADDRESS_TYPE_OSMOSIS: Osmosis address type (e.g. osmo10kmgv5gzygnecf46x092ecfe5xcvvv9rlt823n).
+  warden.warden.v1beta2.QueryKeychainByIdResponse:
+    type: object
+    properties:
+      keychain:
+        type: object
+        properties:
+          id:
+            type: string
+            format: uint64
+          creator:
+            type: string
+          description:
+            type: string
+          admins:
+            type: array
+            items:
+              type: string
+          parties:
+            type: array
+            items:
+              type: string
+          admin_intent_id:
+            type: string
+            format: uint64
+          fees:
+            type: object
+            properties:
+              key_req:
+                type: string
+                format: int64
+              sig_req:
+                type: string
+                format: int64
+          is_active:
+            type: boolean
+  warden.warden.v1beta2.QueryKeychainsResponse:
+    type: object
+    properties:
+      pagination:
+        type: object
+        properties:
+          next_key:
+            type: string
+            format: byte
+            description: |-
+              next_key is the key to be passed to PageRequest.key to
+              query the next page most efficiently. It will be empty if
+              there are no more results.
+          total:
+            type: string
+            format: uint64
+            title: >-
+              total is total number of results available if
+              PageRequest.count_total
+
+              was set, its value is undefined otherwise
+        description: |-
+          PageResponse is to be embedded in gRPC response messages where the
+          corresponding request message has used PageRequest.
+
+           message SomeResponse {
+                   repeated Bar results = 1;
+                   PageResponse page = 2;
+           }
+      keychains:
+        type: array
+        items:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uint64
+            creator:
+              type: string
+            description:
+              type: string
+            admins:
+              type: array
+              items:
+                type: string
+            parties:
+              type: array
+              items:
+                type: string
+            admin_intent_id:
+              type: string
+              format: uint64
+            fees:
+              type: object
+              properties:
+                key_req:
+                  type: string
+                  format: int64
+                sig_req:
+                  type: string
+                  format: int64
+            is_active:
+              type: boolean
+  warden.warden.v1beta2.QueryKeysResponse:
+    type: object
+    properties:
+      pagination:
+        type: object
+        properties:
+          next_key:
+            type: string
+            format: byte
+            description: |-
+              next_key is the key to be passed to PageRequest.key to
+              query the next page most efficiently. It will be empty if
+              there are no more results.
+          total:
+            type: string
+            format: uint64
+            title: >-
+              total is total number of results available if
+              PageRequest.count_total
+
+              was set, its value is undefined otherwise
+        description: |-
+          PageResponse is to be embedded in gRPC response messages where the
+          corresponding request message has used PageRequest.
+
+           message SomeResponse {
+                   repeated Bar results = 1;
+                   PageResponse page = 2;
+           }
+      keys:
+        type: array
+        items:
+          type: object
+          properties:
+            key:
+              type: object
+              properties:
+                id:
+                  type: string
+                  format: uint64
+                space_id:
+                  type: string
+                  format: uint64
+                keychain_id:
+                  type: string
+                  format: uint64
+                type:
+                  type: string
+                  enum:
+                    - KEY_TYPE_UNSPECIFIED
+                    - KEY_TYPE_ECDSA_SECP256K1
+                    - KEY_TYPE_EDDSA_ED25519
+                  default: KEY_TYPE_UNSPECIFIED
+                  description: >-
+                    KeyType indicates what crypto scheme will be used by this
+                    key (e.g.
+
+                    ECDSA). Its public key will be one of the specified type.
+
+                     - KEY_TYPE_UNSPECIFIED: The key type is missing.
+                     - KEY_TYPE_ECDSA_SECP256K1: The key is an ECDSA secp256k1 key.
+                     - KEY_TYPE_EDDSA_ED25519: The key is an EdDSA Ed25519 key.
+                public_key:
+                  type: string
+                  format: byte
+                intent_id:
+                  type: string
+                  format: uint64
+                  description: >-
+                    IntentId is the ID of the intent that will need to be
+                    satisfied for using
+
+                    this key to sign data.
+
+                    If this is not set, the key will use the signing intent of
+                    the Space.
+            addresses:
+              type: array
+              items:
+                type: object
+                properties:
+                  address:
+                    type: string
+                  type:
+                    type: string
+                    enum:
+                      - ADDRESS_TYPE_UNSPECIFIED
+                      - ADDRESS_TYPE_ETHEREUM
+                      - ADDRESS_TYPE_OSMOSIS
+                    default: ADDRESS_TYPE_UNSPECIFIED
+                    description: |2-
+                       - ADDRESS_TYPE_UNSPECIFIED: The address type is missing.
+                       - ADDRESS_TYPE_ETHEREUM: Ethereum address type (e.g. 0x71C7656EC7ab88b098defB751B7401B5f6d8976F).
+                       - ADDRESS_TYPE_OSMOSIS: Osmosis address type (e.g. osmo10kmgv5gzygnecf46x092ecfe5xcvvv9rlt823n).
+  warden.warden.v1beta2.QueryParamsResponse:
+    type: object
+    properties:
+      params:
+        description: params holds all the parameters of this module.
+        type: object
+    description: QueryParamsResponse is response type for the Query/Params RPC method.
+  warden.warden.v1beta2.QuerySignatureRequestByIdResponse:
+    type: object
+    properties:
+      sign_request:
+        type: object
+        properties:
+          id:
+            type: string
+            format: uint64
+          creator:
+            type: string
+          key_id:
+            type: string
+            format: uint64
+          data_for_signing:
+            type: string
+            format: byte
+          status:
+            type: string
+            enum:
+              - SIGN_REQUEST_STATUS_UNSPECIFIED
+              - SIGN_REQUEST_STATUS_PENDING
+              - SIGN_REQUEST_STATUS_FULFILLED
+              - SIGN_REQUEST_STATUS_REJECTED
+            default: SIGN_REQUEST_STATUS_UNSPECIFIED
+            description: >-
+              SignRequestStatus indicates the status of a signature request.
+
+              A request starts as "pending", waiting to be picked up. Then it
+              can move to
+
+              either "approved" or "rejected", depending on the decision of the
+              keychain.
+
+               - SIGN_REQUEST_STATUS_UNSPECIFIED: The request is missing the status field.
+               - SIGN_REQUEST_STATUS_PENDING: The request is waiting to be fulfilled. This is the initial state of a
+              request.
+               - SIGN_REQUEST_STATUS_FULFILLED: The request was fulfilled. This is a final state for a request.
+               - SIGN_REQUEST_STATUS_REJECTED: The request was rejected. This is a final state for a request.
+          signed_data:
+            type: string
+            format: byte
+          reject_reason:
+            type: string
+  warden.warden.v1beta2.QuerySignatureRequestsResponse:
+    type: object
+    properties:
+      pagination:
+        type: object
+        properties:
+          next_key:
+            type: string
+            format: byte
+            description: |-
+              next_key is the key to be passed to PageRequest.key to
+              query the next page most efficiently. It will be empty if
+              there are no more results.
+          total:
+            type: string
+            format: uint64
+            title: >-
+              total is total number of results available if
+              PageRequest.count_total
+
+              was set, its value is undefined otherwise
+        description: |-
+          PageResponse is to be embedded in gRPC response messages where the
+          corresponding request message has used PageRequest.
+
+           message SomeResponse {
+                   repeated Bar results = 1;
+                   PageResponse page = 2;
+           }
+      sign_requests:
+        type: array
+        items:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uint64
+            creator:
+              type: string
+            key_id:
+              type: string
+              format: uint64
+            data_for_signing:
+              type: string
+              format: byte
+            status:
+              type: string
+              enum:
+                - SIGN_REQUEST_STATUS_UNSPECIFIED
+                - SIGN_REQUEST_STATUS_PENDING
+                - SIGN_REQUEST_STATUS_FULFILLED
+                - SIGN_REQUEST_STATUS_REJECTED
+              default: SIGN_REQUEST_STATUS_UNSPECIFIED
+              description: >-
+                SignRequestStatus indicates the status of a signature request.
+
+                A request starts as "pending", waiting to be picked up. Then it
+                can move to
+
+                either "approved" or "rejected", depending on the decision of
+                the keychain.
+
+                 - SIGN_REQUEST_STATUS_UNSPECIFIED: The request is missing the status field.
+                 - SIGN_REQUEST_STATUS_PENDING: The request is waiting to be fulfilled. This is the initial state of a
+                request.
+                 - SIGN_REQUEST_STATUS_FULFILLED: The request was fulfilled. This is a final state for a request.
+                 - SIGN_REQUEST_STATUS_REJECTED: The request was rejected. This is a final state for a request.
+            signed_data:
+              type: string
+              format: byte
+            reject_reason:
+              type: string
+  warden.warden.v1beta2.QuerySpaceByIdResponse:
+    type: object
+    properties:
+      space:
+        type: object
+        properties:
+          id:
+            type: string
+            format: uint64
+          creator:
+            type: string
+          owners:
+            type: array
+            items:
+              type: string
+          admin_intent_id:
+            type: string
+            format: uint64
+            description: >-
+              Optional ID of the intent to be applied to every *admin*
+              operation.
+
+              If not specified, the default intent is used.
+
+
+              Admin operations are:
+
+              - warden.warden.Msg.AddSpaceOwner
+
+              - warden.warden.Msg.RemoveSpaceOwner
+
+
+              The default intent is to allow any operation when at least one of
+              its
+
+              owner approves it.
+          sign_intent_id:
+            type: string
+            format: uint64
+            description: >-
+              Optional ID of the intent to be applied to every *sign* operation.
+
+              If not specified, the default intent is used.
+
+
+              Sign operations are:
+
+              - warden.warden.Msg.NewKeyRequest
+
+              - warden.warden.Msg.NewSignTransactionRequest
+
+              - warden.warden.Msg.NewSignatureRequest
+
+              - warden.warden.Msg.NewWalletRequest
+
+
+              The default intent is to allow any operation when at least one of
+              its
+
+              owner approves it.
+        description: >-
+          Space is a collection of users (called owners) that manages a set of
+          keys.
+  warden.warden.v1beta2.QuerySpacesResponse:
+    type: object
+    properties:
+      pagination:
+        type: object
+        properties:
+          next_key:
+            type: string
+            format: byte
+            description: |-
+              next_key is the key to be passed to PageRequest.key to
+              query the next page most efficiently. It will be empty if
+              there are no more results.
+          total:
+            type: string
+            format: uint64
+            title: >-
+              total is total number of results available if
+              PageRequest.count_total
+
+              was set, its value is undefined otherwise
+        description: |-
+          PageResponse is to be embedded in gRPC response messages where the
+          corresponding request message has used PageRequest.
+
+           message SomeResponse {
+                   repeated Bar results = 1;
+                   PageResponse page = 2;
+           }
+      spaces:
+        type: array
+        items:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uint64
+            creator:
+              type: string
+            owners:
+              type: array
+              items:
+                type: string
+            admin_intent_id:
+              type: string
+              format: uint64
+              description: >-
+                Optional ID of the intent to be applied to every *admin*
+                operation.
+
+                If not specified, the default intent is used.
+
+
+                Admin operations are:
+
+                - warden.warden.Msg.AddSpaceOwner
+
+                - warden.warden.Msg.RemoveSpaceOwner
+
+
+                The default intent is to allow any operation when at least one
+                of its
+
+                owner approves it.
+            sign_intent_id:
+              type: string
+              format: uint64
+              description: >-
+                Optional ID of the intent to be applied to every *sign*
+                operation.
+
+                If not specified, the default intent is used.
+
+
+                Sign operations are:
+
+                - warden.warden.Msg.NewKeyRequest
+
+                - warden.warden.Msg.NewSignTransactionRequest
+
+                - warden.warden.Msg.NewSignatureRequest
+
+                - warden.warden.Msg.NewWalletRequest
+
+
+                The default intent is to allow any operation when at least one
+                of its
+
+                owner approves it.
+          description: >-
+            Space is a collection of users (called owners) that manages a set of
+            keys.
+  warden.warden.v1beta2.SignRequest:
+    type: object
+    properties:
+      id:
+        type: string
+        format: uint64
+      creator:
+        type: string
+      key_id:
+        type: string
+        format: uint64
+      data_for_signing:
+        type: string
+        format: byte
+      status:
+        type: string
+        enum:
+          - SIGN_REQUEST_STATUS_UNSPECIFIED
+          - SIGN_REQUEST_STATUS_PENDING
+          - SIGN_REQUEST_STATUS_FULFILLED
+          - SIGN_REQUEST_STATUS_REJECTED
+        default: SIGN_REQUEST_STATUS_UNSPECIFIED
+        description: >-
+          SignRequestStatus indicates the status of a signature request.
+
+          A request starts as "pending", waiting to be picked up. Then it can
+          move to
+
+          either "approved" or "rejected", depending on the decision of the
+          keychain.
+
+           - SIGN_REQUEST_STATUS_UNSPECIFIED: The request is missing the status field.
+           - SIGN_REQUEST_STATUS_PENDING: The request is waiting to be fulfilled. This is the initial state of a
+          request.
+           - SIGN_REQUEST_STATUS_FULFILLED: The request was fulfilled. This is a final state for a request.
+           - SIGN_REQUEST_STATUS_REJECTED: The request was rejected. This is a final state for a request.
+      signed_data:
+        type: string
+        format: byte
+      reject_reason:
+        type: string
+  warden.warden.v1beta2.Space:
+    type: object
+    properties:
+      id:
+        type: string
+        format: uint64
+      creator:
+        type: string
+      owners:
+        type: array
+        items:
+          type: string
+      admin_intent_id:
+        type: string
+        format: uint64
+        description: |-
+          Optional ID of the intent to be applied to every *admin* operation.
+          If not specified, the default intent is used.
+
+          Admin operations are:
+          - warden.warden.Msg.AddSpaceOwner
+          - warden.warden.Msg.RemoveSpaceOwner
+
+          The default intent is to allow any operation when at least one of its
+          owner approves it.
+      sign_intent_id:
+        type: string
+        format: uint64
+        description: |-
+          Optional ID of the intent to be applied to every *sign* operation.
+          If not specified, the default intent is used.
+
+          Sign operations are:
+          - warden.warden.Msg.NewKeyRequest
+          - warden.warden.Msg.NewSignTransactionRequest
+          - warden.warden.Msg.NewSignatureRequest
+          - warden.warden.Msg.NewWalletRequest
+
+          The default intent is to allow any operation when at least one of its
+          owner approves it.
+    description: Space is a collection of users (called owners) that manages a set of keys.

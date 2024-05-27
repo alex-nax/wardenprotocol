@@ -72,7 +72,7 @@ interface ACNode {
 	next: ACNode[];
 	parent?: ACNode;
 	value: (x: string) => string | undefined;
-	type: "root" | "fn" | "arg" | "op" | "group";
+	type: "root" | "fn" | "arg" | "op" | "group" | "util";
 }
 
 const insertOpNodes = (prev: ACNode, root: ACNode) => {
@@ -107,6 +107,19 @@ const buildGraph = () => {
 		let prev: ACNode = node;
 
 		for (const arg of fnDesc.args) {
+			// fixme
+			if (arg === "arr") {
+				const fromNode: ACNode = {
+					parent: prev,
+					next: [],
+					value: () => "FROM",
+					type: "util",
+				};
+
+				prev.next.push(fromNode);
+				prev = fromNode;
+			}
+
 			const argNode: ACNode = {
 				parent: prev,
 				next: [],
@@ -140,6 +153,7 @@ const buildGraph = () => {
 
 	insertOpNodes(ref, root);
 	root.next.push(ref);
+	return root;
 };
 
 export const AUTOCOMPLETE_GRAPH = buildGraph();
@@ -277,9 +291,7 @@ const tokenize = (node: CNode, refs: RefDictionary) => {
 
 export const parseCode = (code: string) => {
 	const refs: Record<string, CNode> = {};
-
 	const errs = errors();
-
 	let count = 0;
 	const getRef = () => `R${count++}`;
 	const rootRef = getRef();
