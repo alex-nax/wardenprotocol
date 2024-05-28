@@ -757,6 +757,15 @@ export const toShield = (
 			}
 		} else if (token in OPS) {
 			const { value } = OPS[token];
+
+			if (i === node.tokens.length - 1) {
+				errs.add(i, {
+					node,
+					tokenIndex: i,
+					message: `Unexpected end of expression`,
+				});
+			}
+
 			result += ` ${value} `;
 		} else if (token in FNS) {
 			const fn = FNS[token];
@@ -863,7 +872,19 @@ export const toShield = (
 			result += `${token.toLowerCase()}(${args.join(", ")})`;
 		} else if (token.toUpperCase().startsWith("ADR")) {
 			// todo check correct index
-			result += addresses[parseInt(token.substring(3), 10) - 1];
+			const addrIndex = parseInt(token.substring(3), 10) - 1;
+
+			if (!addresses[addrIndex]) {
+				errs.add(i, {
+					node,
+					tokenIndex: i,
+					message: `Address not found: ${token}`,
+					code: ERROR_CODES.UNEXPECTED_TOKEN,
+					value: token,
+				});
+			}
+
+			result += addresses[addrIndex];
 		} else {
 			errs.add(i, {
 				node,

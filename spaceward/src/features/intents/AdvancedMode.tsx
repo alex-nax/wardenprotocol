@@ -95,9 +95,7 @@ const useInput = (code: string, params?: Omit<AutocompleteParams, "index">) => {
 	});
 
 	const position = getPosition(state.selection, prev.current?.selection);
-
 	const result = useMemo(() => parseCode(state.code), [state.code]);
-
 	const ref = useRef<HTMLInputElement | null>(null);
 
 	const lookup = useMemo(
@@ -140,7 +138,7 @@ const useInput = (code: string, params?: Omit<AutocompleteParams, "index">) => {
 
 				return x;
 			}),
-		[lookup, result],
+		[lookup, result, params?.addresses],
 	);
 
 	const numSuggest = items.length;
@@ -281,7 +279,6 @@ export default function AdvancedMode({
 	const [addresses, setAddresses] = useState(_addresses ?? []);
 	const input = useInput(humanReadable.code, { addresses });
 	const isUpdated = input.state.code !== humanReadable.code;
-
 	const formRef = useRef<HTMLFormElement | null>(null);
 
 	useClickOutside(formRef, () => {
@@ -352,11 +349,13 @@ export default function AdvancedMode({
 			) : null}
 
 			<AddressList
+				warning={!addresses.length}
 				addresses={addresses}
 				onChange={setAddresses}
 				onAdd={() =>
 					toggleChangeAddresses(addresses, "person", setAddresses)
 				}
+				withEditorLabel
 			/>
 
 			<form
@@ -456,7 +455,9 @@ export default function AdvancedMode({
 
 			{children?.({
 				code: input.shield?.value ?? "",
-				error: error?.message,
+				error: addresses.length
+					? error?.message
+					: "Please add at least one approver",
 				isUpdated,
 			})}
 		</div>
