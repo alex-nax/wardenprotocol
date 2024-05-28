@@ -1,162 +1,12 @@
-type NodeType = "expression" | "array";
-
-export interface CNode {
-	id: string;
-	children: string[];
-	parent?: string;
-	range: [number, number];
-	root: string;
-	value: string;
-	type?: NodeType;
-	tokenRanges?: [number, number][];
-	tokens?: string[];
-}
-
-export type RefDictionary = Record<string, CNode>;
-
-type IsTokenized = CNode &
-	Required<Pick<CNode, "tokenRanges" | "tokens" | "type">>;
-
-interface ErrorEntry {
-	node: CNode;
-	tokenIndex: number;
-	message: string;
-	code?: string;
-	value?: string;
-}
-
-type ErrorData = Record<number, ErrorEntry[]>;
-type ArgumentType = "num" | "arr";
-
-interface FunctionDescriptor {
-	args: ArgumentType[];
-	name: string;
-}
-
-interface OperatorDescriptor {
-	precedence: number;
-	value: string;
-}
-
-export const ERROR_CODES = {
-	OPEN_PARENTHESIS: "ERR_OPEN_PARENTHESIS",
-	CLOSE_PARENTHESIS: "ERR_CLOSE_PARENTHESIS",
-	EXPECTED_ARG_TYPE: "ERR_EXPECTED_ARG_TYPE",
-	UNEXPECTED_TOKEN_IN_ARRAY: "ERR_UNEXPECTED_TOKEN_IN_ARRAY",
-	UNEXPECTED_TOKEN: "ERR_UNEXPECTED_TOKEN",
-};
-
-export const FNS: Record<string, FunctionDescriptor> = {
-	ALL: {
-		name: "all",
-		args: ["arr"],
-	},
-	ANY: {
-		name: "any",
-		args: ["num", "arr"],
-	},
-};
-
-export const OPS: Record<string, OperatorDescriptor> = {
-	AND: {
-		precedence: 1,
-		value: "&&",
-	},
-	OR: {
-		precedence: 2,
-		value: "||",
-	},
-};
-
-interface ACNode {
-	next: ACNode[];
-	parent?: ACNode;
-	value: (x: string) => string | undefined;
-	type: "root" | "fn" | "arg" | "op" | "group" | "util";
-}
-
-const insertOpNodes = (prev: ACNode, root: ACNode) => {
-	for (const [op] of getEntries(OPS)) {
-		const opNode: ACNode = {
-			parent: prev,
-			next: [root],
-			value: () => op,
-			type: "op",
-		};
-
-		prev.next.push(opNode);
-	}
-};
-
-const buildGraph = () => {
-	const root: ACNode = {
-		parent: undefined,
-		next: [],
-		value: () => undefined,
-		type: "root",
-	};
-
-	for (const [fn, fnDesc] of getEntries(FNS)) {
-		const node: ACNode = {
-			parent: root,
-			next: [],
-			value: () => fn,
-			type: "fn",
-		};
-
-		let prev: ACNode = node;
-
-		for (const arg of fnDesc.args) {
-			// fixme
-			if (arg === "arr") {
-				const fromNode: ACNode = {
-					parent: prev,
-					next: [],
-					value: () => "FROM",
-					type: "util",
-				};
-
-				prev.next.push(fromNode);
-				prev = fromNode;
-			}
-
-			const argNode: ACNode = {
-				parent: prev,
-				next: [],
-				value: () => arg,
-				type: "arg",
-			};
-
-			prev.next.push(argNode);
-			prev = argNode;
-		}
-
-		insertOpNodes(prev, node);
-		root.next.push(node);
-	}
-
-	const group: ACNode = {
-		parent: root,
-		next: [root],
-		value: () => "()",
-		type: "group",
-	};
-
-	root.next.push(group);
-
-	const ref: ACNode = {
-		parent: root,
-		next: [],
-		value: (x) => x,
-		type: "arg",
-	};
-
-	insertOpNodes(ref, root);
-	root.next.push(ref);
-	return root;
-};
-
-export const AUTOCOMPLETE_GRAPH = buildGraph();
+import { ERROR_CODES, FNS, OPS } from "./constants";
+import type {
+	CNode,
+	ErrorData,
+	ErrorEntry,
+	IsTokenized,
+	NodeType,
+	RefDictionary,
+} from "./types";
 
 export const isTokenized = (node?: CNode): node is IsTokenized =>
 	Boolean(node?.type && node?.tokenRanges && node?.tokens);
@@ -217,7 +67,7 @@ const normalize = (node: CNode, refs: RefDictionary) => {
 		throw new Error("Root node not found");
 	}
 
-	let value = root.value.substring(node.range[0], node.range[1] + 1);
+	let value = root.value.slice(...node.range);
 
 	for (let i = node.children.length - 1; i >= 0; i--) {
 		const child = refs[node.children[i]];
@@ -232,7 +82,9 @@ const normalize = (node: CNode, refs: RefDictionary) => {
 			[" ", ")"],
 		);
 
-		value = `${before ? `${before} ` : ""}${child.id}${after ? ` ${after}` : ""}`;
+		value = `${before ? `${before} ` : ""}${child.id}${
+			after ? ` ${after}` : ""
+		}`;
 	}
 
 	return trimSymbols(value, [" ", "(", ")"]);
@@ -240,22 +92,43 @@ const normalize = (node: CNode, refs: RefDictionary) => {
 
 const tokenize = (node: CNode, refs: RefDictionary) => {
 	const normalized = normalize(node, refs);
-
 	const root = refs[node.root];
 
 	if (!root) {
 		throw new Error("Root node not found");
 	}
 
-	// TODO lookup for FROM keyword before node
-	const type: NodeType =
-		normalized.indexOf(",") >= 0 ? "array" : "expression";
+	let type: NodeType = "expression";
+
+	if (node.parent) {
+		const parent = refs[node.parent];
+
+		if (!isTokenized(parent)) {
+			throw new Error("invalid parent node");
+		}
+
+		const index = parent.tokens.indexOf(node.id);
+
+		if (index < 0) {
+			console.warn(`ref ${node.id} not found in parent ${parent.id}`);
+		}
+
+		if (index > 0) {
+			if (parent.tokens[index - 1].toUpperCase() === "FROM") {
+				type = "array";
+			}
+		}
+	}
 
 	let pos = node.range[0];
 
 	const tokens =
 		type === "array"
-			? normalized.split(",").map((x) => x.trim())
+			? normalized
+					.split(",")
+					.flatMap((x) => x.split(" "))
+					.map((x) => x.trim())
+					.filter(Boolean)
 			: normalized.split(" ").filter(Boolean);
 
 	const tokenRanges: [number, number][] = [];
@@ -274,16 +147,17 @@ const tokenize = (node: CNode, refs: RefDictionary) => {
 						length: refs[token].range[1] - refs[token].range[0],
 					}
 				: { search: token, length: token.length };
-		const start = root.value.indexOf(search, pos);
+
+		const start = node.value.indexOf(search, pos - node.range[0]);
 
 		if (start < 0) {
 			throw new Error(`Token ${token} not found`);
 		}
 
-		const end = start + length - 1; // +1 ?
-
-		tokenRanges.push([start, end]);
-		pos = end + 1;
+		const _start = node.range[0] + start;
+		const end = _start + length;
+		tokenRanges.push([_start, end]);
+		pos = end;
 	}
 
 	return { tokenRanges, tokens, type };
@@ -291,14 +165,16 @@ const tokenize = (node: CNode, refs: RefDictionary) => {
 
 export const parseCode = (code: string) => {
 	const refs: Record<string, CNode> = {};
+
 	const errs = errors();
+
 	let count = 0;
 	const getRef = () => `R${count++}`;
 	const rootRef = getRef();
 
 	refs[rootRef] = {
 		id: rootRef,
-		range: [0, code.length - 1],
+		range: [0, code.length],
 		children: [],
 		value: code,
 		root: rootRef,
@@ -319,9 +195,7 @@ export const parseCode = (code: string) => {
 
 		if (parens[char as keyof typeof parens]) {
 			const close = parens[char as keyof typeof parens];
-
 			const parent = stack.length ? stack[stack.length - 1].ref : rootRef;
-
 			const ref = getRef();
 			stack.push({ close, start: i, ref, parent });
 		} else if (char === stack[stack.length - 1]?.close) {
@@ -336,7 +210,7 @@ export const parseCode = (code: string) => {
 			} else {
 				refs[v.ref] = {
 					id: v.ref,
-					range: [v.start, i],
+					range: [v.start, i + 1],
 					value: code.slice(v.start, i + 1),
 					parent: v.parent,
 					children: [],
@@ -354,12 +228,26 @@ export const parseCode = (code: string) => {
 	}
 
 	if (stack.length) {
-		errs.add(stack[stack.length - 1].start, {
-			code: ERROR_CODES.CLOSE_PARENTHESIS,
-			message: "Missing closing parenthesis",
-			node: refs[rootRef],
-			tokenIndex: -1,
-		});
+		for (let i = 0; i < stack.length; i++) {
+			const elem = stack[i];
+			const range: [number, number] = [elem.start, code.length];
+
+			refs[elem.ref] = {
+				id: elem.ref,
+				range,
+				value: code.slice(...range),
+				children: [],
+				root: rootRef,
+				parent: elem.parent,
+			};
+
+			errs.add(elem.start, {
+				code: ERROR_CODES.CLOSE_PARENTHESIS,
+				message: "Missing closing parenthesis",
+				node: refs[elem.ref],
+				tokenIndex: -1,
+			});
+		}
 	}
 
 	const refList = Object.keys(refs);
@@ -374,32 +262,37 @@ export const parseCode = (code: string) => {
 	}
 
 	// tokenize
-	for (const id of refList) {
+	const nodes = [refs[rootRef]];
+	while (nodes.length) {
+		const node = nodes.pop();
+
+		if (!node) {
+			throw new Error("invalid node");
+		}
+
+		const { id, children } = node;
 		const { tokenRanges, tokens, type } = tokenize(refs[id], refs);
 		refs[id].tokenRanges = tokenRanges;
 		refs[id].tokens = tokens;
 		refs[id].type = type;
-	}
 
-	// fixme better determine arrays
-	for (const id of refList) {
-		const parentId = refs[id].parent;
-
-		if (parentId && parentId in refs) {
-			const parent = refs[parentId];
-			const index = parent.tokens?.findIndex((x) => x === id) ?? -1;
-
-			if (index > 0) {
-				if (parent.tokens?.[index - 1].toUpperCase() === "FROM") {
-					refs[id].type = "array";
-				}
-			}
+		for (const child of children) {
+			nodes.push(refs[child]);
 		}
 	}
 
 	return { refs, errors: errs.data, rootRef };
 };
 
+export interface ACNode {
+	next: ACNode[];
+	parent?: ACNode;
+	value?: string;
+	description?: string;
+}
+
+export const NUM_VALUE = "$NUM";
+export const ADR_VALUE = "$ADR";
 export function hasEntries<T>(obj?: T): obj is T {
 	return obj ? Boolean(Object.keys(obj).length) : false;
 }
@@ -420,6 +313,366 @@ export function getEntries<T>(obj?: T): [keyof T, T[keyof T]][] {
 
 	return Object.entries(obj as any) as [keyof T, T[keyof T]][];
 }
+
+const createAutocompleteGraph = () => {
+	const root: ACNode = { next: [] };
+
+	const addOpNodes = (parent?: ACNode) => {
+		for (const [name, { description }] of getEntries(OPS)) {
+			const node: ACNode = {
+				next: [root],
+				parent,
+				value: name,
+				description,
+			};
+			parent?.next.push(node);
+		}
+	};
+
+	for (const [name, descriptor] of getEntries(FNS)) {
+		const node: ACNode = {
+			next: [],
+			value: name,
+			parent: root,
+			description: descriptor.description,
+		};
+
+		root.next.push(node);
+		let prev = node;
+
+		for (const arg of descriptor.args) {
+			if (arg === "num") {
+				const numNode: ACNode = {
+					next: [],
+					value: NUM_VALUE,
+					parent: prev,
+				};
+				prev.next.push(numNode);
+				prev = numNode;
+			} else if (arg === "arr") {
+				const fromNode: ACNode = {
+					next: [],
+					value: "FROM",
+					parent: prev,
+				};
+				prev.next.push(fromNode);
+				prev = fromNode;
+				const parenthesesNode: ACNode = {
+					next: [],
+					value: "()",
+					parent: prev,
+				};
+				prev.next.push(parenthesesNode);
+				prev = parenthesesNode;
+			}
+		}
+
+		addOpNodes(prev);
+	}
+
+	const parenthesesNode: ACNode = { next: [], value: "()", parent: root };
+	addOpNodes(parenthesesNode);
+	root.next.push(parenthesesNode);
+
+	const adrNode: ACNode = {
+		next: [],
+		value: ADR_VALUE,
+		parent: root,
+		description: ADR_VALUE,
+	};
+	addOpNodes(adrNode);
+	root.next.push(adrNode);
+
+	const array: ACNode = {
+		next: [],
+		value: ADR_VALUE,
+		description: ADR_VALUE,
+	};
+	array.next.push(array);
+	return { array, expression: root };
+};
+
+export const findByPosition = (
+	pos: number,
+	refs: RefDictionary,
+	rootRef: string,
+) => {
+	const root = refs[rootRef];
+	if (!root) {
+		throw new Error(`root node not found at ref ${rootRef}`);
+	}
+
+	let parent: CNode | undefined;
+	let node = root; // start from root
+
+	while (true) {
+		if (pos < node.range[0] || pos > node.range[1]) {
+			if (!isTokenized(node)) {
+				throw new Error(`node ${node.id} not initialized`);
+			}
+
+			if (node.id !== root.id) {
+				throw new Error(
+					`position ${pos} out of node range ${node.range}`,
+				);
+			}
+
+			return {
+				index: -1,
+				node,
+				parent,
+				prev: node.tokens.length - 1,
+				end: false,
+			};
+		}
+
+		let inChildren = false;
+
+		for (const child of node.children) {
+			if (pos >= refs[child].range[0] && pos < refs[child].range[1]) {
+				parent = node;
+				node = refs[child];
+				inChildren = true;
+				break;
+			}
+		}
+
+		if (!inChildren) {
+			break;
+		}
+	}
+
+	if (!isTokenized(node)) {
+		throw new Error(`node ${node.id} not initialized`);
+	}
+
+	let index = -1;
+	let prev = -1;
+	let end = false;
+
+	for (let i = 0; i < node.tokenRanges.length; i++) {
+		end = false;
+		const range = node.tokenRanges[i];
+
+		if (pos <= range[1] && pos >= range[0]) {
+			index = i;
+			end = range[1] === pos;
+			break;
+		} else if (range[0] >= pos && prev >= 0) {
+			const pRange = node.tokenRanges[prev];
+
+			if (pRange[1] <= pos) {
+				break;
+			} else if (pRange[0] > pos) {
+				index = prev;
+				break;
+			}
+		}
+
+		prev = i;
+	}
+
+	return { index, node, parent, prev, end };
+};
+
+type ParseResult = ReturnType<typeof parseCode>;
+type Lookup = ReturnType<typeof findByPosition>;
+const graph = createAutocompleteGraph();
+
+const getNext = ({ next }: ACNode) => {
+	if (next.length === 1 && !next[0].value) {
+		return next[0].next;
+	}
+
+	return next;
+};
+
+export const LOOKUP_SYMBOL = "#";
+
+const stringify = (node: IsTokenized, refs: RefDictionary) => {
+	const { type, tokens } = node;
+
+	let value = tokens
+		.map((x) => (x in refs ? refs[x].value : x))
+		.join(type === "array" ? ", " : " ");
+
+	let parent = node.parent;
+	let id = node.id;
+
+	while (parent) {
+		const pNode = refs[parent];
+		const prevValue = `(${value})`;
+
+		if (!isTokenized(pNode)) {
+			throw new Error("invalid parent node");
+		}
+
+		value = pNode.tokens
+			.map((x) => (x === id ? prevValue : x in refs ? refs[x].value : x))
+			.join(pNode.type === "array" ? ", " : " ");
+
+		parent = pNode.parent;
+		id = pNode.id;
+	}
+
+	return value;
+};
+
+export interface AutocompleteItem {
+	value: string;
+	lookupSymbol: string;
+	title: string;
+	description: string;
+}
+
+export const autocomplete = (
+	lookup: Lookup,
+	parseResult: ParseResult,
+): AutocompleteItem[] => {
+	const { refs, rootRef, errors } = parseResult;
+	const root = refs[rootRef];
+
+	if (!isTokenized(root)) {
+		throw new Error("root node not initialized");
+	}
+
+	const exact = lookup.index >= 0;
+	let index = exact ? lookup.index : lookup.prev;
+	let acNode = graph[lookup.node.type];
+	let next: ACNode | undefined;
+
+	if (hasEntries(errors)) {
+		const [_pos, [error]] = getFirstEntry(errors)!;
+		const pos = Number(_pos);
+
+		switch (error.code) {
+			case ERROR_CODES.CLOSE_PARENTHESIS: {
+				const result =
+					root.value.slice(0, pos + 1) +
+					")" +
+					LOOKUP_SYMBOL +
+					root.value.slice(pos + 1);
+
+				return [
+					{
+						value: result,
+						lookupSymbol: LOOKUP_SYMBOL,
+						title: ")",
+						description: "Add closing parenthesis",
+					},
+				];
+			}
+
+			case ERROR_CODES.OPEN_PARENTHESIS: {
+				const result =
+					root.value.slice(0, pos) +
+					"(" +
+					LOOKUP_SYMBOL +
+					root.value.slice(pos);
+
+				return [
+					{
+						value: result,
+						lookupSymbol: LOOKUP_SYMBOL,
+						title: "(",
+						description: "Add opening parenthesis",
+					},
+				];
+			}
+
+			default: {
+				console.warn(errors);
+				throw new Error("not implemented");
+			}
+		}
+	} else if (index < 0) {
+		return getNext(acNode).map((x) => {
+			const tokens = [...lookup.node.tokens];
+			tokens.splice(0, 0, `${x.value ?? ""}${LOOKUP_SYMBOL}`);
+			const node = { ...lookup.node, tokens };
+
+			return {
+				value: stringify(node, refs),
+				lookupSymbol: LOOKUP_SYMBOL,
+				title: x.value ?? "",
+				description: x.description ?? "",
+			};
+		});
+	}
+
+	let fixup = false;
+
+	for (let i = 0; i <= index; i++) {
+		const token = lookup.node.tokens[i];
+
+		next = getNext(acNode).find((child) => {
+			switch (child.value) {
+				case NUM_VALUE: {
+					return Number.isFinite(Number(token));
+				}
+
+				case ADR_VALUE: {
+					return token.toUpperCase().startsWith("ADR");
+				}
+
+				default: {
+					if (token in refs) {
+						return child.value === "()";
+					} else {
+						return token.toUpperCase() === child.value;
+					}
+				}
+			}
+		});
+
+		if (!next) {
+			index = i;
+			next = acNode;
+			fixup = true;
+			break;
+		} else {
+			acNode = next;
+		}
+	}
+
+	if (!next) {
+		console.warn(lookup);
+		throw new Error("unreachable error; investigate if thrown");
+	}
+
+	const variants =
+		exact && !lookup.end
+			? next.value
+				? [next]
+				: next.next
+			: getNext(next);
+
+	let target = exact && !lookup.end ? index : index + 1;
+
+	if (fixup) {
+		target = index;
+	}
+
+	return variants.map((x) => {
+		const tokens = [...lookup.node.tokens];
+
+		tokens.splice(
+			target,
+			// fixme looks hacky
+			fixup ? 1 : exact ? (lookup.end ? 0 : 1) : 0,
+			`${x.value ?? ""}${LOOKUP_SYMBOL}`,
+		);
+
+		const node = { ...lookup.node, tokens };
+
+		return {
+			value: stringify(node, refs),
+			lookupSymbol: LOOKUP_SYMBOL,
+			title: x.value ?? "",
+			description: x.description ?? "",
+		};
+	});
+};
 
 export const toShield = (
 	node: CNode,
@@ -503,10 +756,10 @@ export const toShield = (
 				result += `(${value})`;
 			}
 		} else if (token in OPS) {
-			const { value } = OPS[token as keyof typeof OPS];
+			const { value } = OPS[token];
 			result += ` ${value} `;
 		} else if (token in FNS) {
-			const fn: FunctionDescriptor = FNS[token];
+			const fn = FNS[token];
 			const argc = fn.args.length;
 
 			if (!argc) {
@@ -535,7 +788,6 @@ export const toShield = (
 							errs.add(tokenIndex, {
 								node,
 								tokenIndex,
-								// TODO first argument can be not a number for some function
 								message: `${token} function expects arg[${j}] to be a number`,
 								code: ERROR_CODES.EXPECTED_ARG_TYPE,
 								value: "num",
